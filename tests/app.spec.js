@@ -10,11 +10,12 @@ test.beforeEach(async ({ page }) => {
 
 test.describe('Home Screen', () => {
   test('shows app title and buttons', async ({ page }) => {
-    await expect(page.locator('.app-title')).toHaveText('What Now?');
+    await expect(page.locator('#screen-home .app-title')).toHaveText('What Now?');
     await expect(page.locator('#btn-add-task')).toBeVisible();
     await expect(page.locator('#btn-what-next')).toBeVisible();
     await expect(page.locator('#btn-manage-tasks')).toBeVisible();
     await expect(page.locator('#btn-gallery')).toBeVisible();
+    await expect(page.locator('#btn-profile')).toBeVisible();
   });
 
   test('rank display hidden when no points', async ({ page }) => {
@@ -342,18 +343,21 @@ test.describe('Gallery', () => {
 
 test.describe('Offline Mode', () => {
   test('app works offline after initial load', async ({ page, context }) => {
-    // Load page first
+    // Load page first and wait for SW to install
     await page.goto('/');
     await page.waitForLoadState('networkidle');
+
+    // Wait for service worker to be ready
+    await page.waitForTimeout(1000);
 
     // Go offline
     await context.setOffline(true);
 
-    // Reload
-    await page.reload();
+    // Reload - may take longer offline
+    await page.reload({ timeout: 10000 });
 
     // App should still work
-    await expect(page.locator('.app-title')).toHaveText('What Now?');
+    await expect(page.locator('#screen-home .app-title')).toHaveText('What Now?', { timeout: 10000 });
     await expect(page.locator('#btn-add-task')).toBeVisible();
   });
 });

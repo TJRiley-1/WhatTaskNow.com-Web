@@ -1,7 +1,6 @@
 // Supabase Client Configuration
-// Get these from: Supabase Dashboard > Settings > API
 const SUPABASE_URL = 'https://jntgomnsvixoroponjcx.supabase.co';
-const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY_HERE'; // Replace with anon/public key from Supabase dashboard
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpudGdvbW5zdml4b3JvcG9uamN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4OTUzMDYsImV4cCI6MjA4NTQ3MTMwNn0.nP6ZmxeOZthqkisBBYXfz8OZrWssuocpLNj5ITs_KIw';
 
 // Simple Supabase client (no build tools needed)
 const Supabase = {

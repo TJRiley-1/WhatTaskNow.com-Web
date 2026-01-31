@@ -24,12 +24,32 @@ const App = {
     lastPointsEarned: 0,
     previousRank: null,
 
+    // Auth state
+    isLoggedIn: false,
+    user: null,
+    profile: null,
+    currentGroup: null,
+
     // Initialize the app
-    init() {
+    async init() {
         this.bindEvents();
         this.renderTaskTypes();
         this.renderEditTaskTypes();
         this.updateRankDisplay();
+
+        // Initialize Supabase and check auth
+        try {
+            const user = await Supabase.init();
+            if (user) {
+                this.isLoggedIn = true;
+                this.user = user;
+                await this.loadProfile();
+            }
+        } catch (e) {
+            console.log('Auth init error:', e);
+        }
+
+        this.updateAuthUI();
         this.showScreen('home');
     },
 
@@ -77,6 +97,11 @@ const App = {
         document.getElementById('btn-gallery').addEventListener('click', () => {
             this.renderGallery();
             this.showScreen('gallery');
+        });
+
+        document.getElementById('btn-profile').addEventListener('click', () => {
+            this.renderProfile();
+            this.showScreen('profile');
         });
 
         // Back buttons
@@ -269,6 +294,9 @@ const App = {
 
         // Import events
         this.bindImportEvents();
+
+        // Auth and social events
+        this.bindAuthEvents();
     },
 
     // Bind multi-add events
@@ -1388,6 +1416,426 @@ const App = {
         } else {
             rankDisplay.querySelector('.rank-progress-fill').style.width = '100%';
             rankDisplay.querySelector('.rank-next').textContent = 'Max rank achieved!';
+        }
+    },
+
+    // ==================== AUTH & SOCIAL FEATURES ====================
+
+    // Bind auth events
+    bindAuthEvents() {
+        // Login screen
+        document.getElementById('btn-google-login').addEventListener('click', () => {
+            Supabase.signInWithGoogle();
+        });
+
+        document.getElementById('btn-email-login').addEventListener('click', () => {
+            this.emailLogin();
+        });
+
+        document.getElementById('btn-email-signup').addEventListener('click', () => {
+            this.emailSignup();
+        });
+
+        document.getElementById('btn-skip-login').addEventListener('click', () => {
+            this.showScreen('home');
+        });
+
+        // Profile screen
+        document.getElementById('btn-sync-data').addEventListener('click', () => {
+            this.syncToCloud();
+        });
+
+        document.getElementById('btn-view-groups').addEventListener('click', () => {
+            this.renderGroups();
+            this.showScreen('groups');
+        });
+
+        document.getElementById('btn-logout').addEventListener('click', () => {
+            this.logout();
+        });
+
+        document.getElementById('btn-login-from-profile').addEventListener('click', () => {
+            this.showScreen('login');
+        });
+
+        // Groups screen
+        document.getElementById('btn-create-group').addEventListener('click', () => {
+            document.getElementById('modal-create-group').classList.remove('hidden');
+            document.getElementById('group-name').focus();
+        });
+
+        document.getElementById('btn-cancel-create-group').addEventListener('click', () => {
+            document.getElementById('modal-create-group').classList.add('hidden');
+        });
+
+        document.getElementById('btn-confirm-create-group').addEventListener('click', () => {
+            this.createGroup();
+        });
+
+        document.getElementById('btn-join-group').addEventListener('click', () => {
+            document.getElementById('modal-join-group').classList.remove('hidden');
+            document.getElementById('join-code').focus();
+        });
+
+        document.getElementById('btn-cancel-join-group').addEventListener('click', () => {
+            document.getElementById('modal-join-group').classList.add('hidden');
+        });
+
+        document.getElementById('btn-confirm-join-group').addEventListener('click', () => {
+            this.joinGroup();
+        });
+
+        // Leaderboard screen
+        document.getElementById('btn-copy-code').addEventListener('click', () => {
+            this.copyInviteCode();
+        });
+
+        document.getElementById('btn-leave-group').addEventListener('click', () => {
+            this.leaveGroup();
+        });
+    },
+
+    // Update UI based on auth state
+    updateAuthUI() {
+        const logoutBtn = document.getElementById('btn-logout');
+        const loginBtn = document.getElementById('btn-login-from-profile');
+        const syncBtn = document.getElementById('btn-sync-data');
+
+        if (this.isLoggedIn) {
+            logoutBtn.classList.remove('hidden');
+            loginBtn.classList.add('hidden');
+            syncBtn.classList.remove('hidden');
+        } else {
+            logoutBtn.classList.add('hidden');
+            loginBtn.classList.remove('hidden');
+            syncBtn.classList.add('hidden');
+        }
+    },
+
+    // Load user profile from Supabase
+    async loadProfile() {
+        if (!Supabase.user) {
+            await Supabase.getUser();
+        }
+
+        if (Supabase.user) {
+            this.user = Supabase.user;
+            const { data } = await DB.getProfile(this.user.id);
+            if (data && data[0]) {
+                this.profile = data[0];
+            }
+        }
+    },
+
+    // Render profile screen
+    renderProfile() {
+        const stats = Storage.getStats();
+
+        if (this.isLoggedIn && this.user) {
+            document.getElementById('profile-name').textContent =
+                this.profile?.display_name || this.user.email?.split('@')[0] || 'User';
+            document.getElementById('profile-email').textContent = this.user.email || '';
+
+            const avatarEl = document.getElementById('profile-avatar');
+            if (this.user.user_metadata?.avatar_url) {
+                avatarEl.innerHTML = `<img src="${this.user.user_metadata.avatar_url}" alt="Avatar">`;
+            } else {
+                avatarEl.innerHTML = '<span class="avatar-placeholder">' +
+                    (this.profile?.display_name?.[0] || this.user.email?.[0] || '?').toUpperCase() + '</span>';
+            }
+        } else {
+            document.getElementById('profile-name').textContent = 'Guest';
+            document.getElementById('profile-email').textContent = 'Not signed in';
+            document.getElementById('profile-avatar').innerHTML = '<span class="avatar-placeholder">?</span>';
+        }
+
+        document.getElementById('profile-points').textContent = stats.totalPoints;
+        document.getElementById('profile-tasks').textContent = stats.completed;
+        document.getElementById('profile-rank').textContent = Storage.getRank(stats.totalPoints).name.replace('Task ', '');
+
+        this.updateAuthUI();
+    },
+
+    // Email login
+    async emailLogin() {
+        const email = document.getElementById('login-email').value.trim();
+        const password = document.getElementById('login-password').value;
+        const errorEl = document.getElementById('login-error');
+
+        if (!email || !password) {
+            errorEl.textContent = 'Please enter email and password';
+            errorEl.classList.remove('hidden');
+            return;
+        }
+
+        try {
+            errorEl.classList.add('hidden');
+            await Supabase.signIn(email, password);
+            this.isLoggedIn = true;
+            await this.loadProfile();
+            this.updateAuthUI();
+            this.showScreen('home');
+        } catch (e) {
+            errorEl.textContent = e.message || 'Login failed';
+            errorEl.classList.remove('hidden');
+        }
+    },
+
+    // Email signup
+    async emailSignup() {
+        const email = document.getElementById('login-email').value.trim();
+        const password = document.getElementById('login-password').value;
+        const errorEl = document.getElementById('login-error');
+
+        if (!email || !password) {
+            errorEl.textContent = 'Please enter email and password';
+            errorEl.classList.remove('hidden');
+            return;
+        }
+
+        if (password.length < 6) {
+            errorEl.textContent = 'Password must be at least 6 characters';
+            errorEl.classList.remove('hidden');
+            return;
+        }
+
+        try {
+            errorEl.classList.add('hidden');
+            await Supabase.signUp(email, password);
+            this.isLoggedIn = true;
+            await this.loadProfile();
+            this.updateAuthUI();
+            this.showScreen('home');
+        } catch (e) {
+            errorEl.textContent = e.message || 'Signup failed';
+            errorEl.classList.remove('hidden');
+        }
+    },
+
+    // Logout
+    async logout() {
+        await Supabase.signOut();
+        this.isLoggedIn = false;
+        this.user = null;
+        this.profile = null;
+        this.updateAuthUI();
+        this.renderProfile();
+    },
+
+    // Sync local data to cloud
+    async syncToCloud() {
+        if (!this.isLoggedIn || !this.user) {
+            this.showScreen('login');
+            return;
+        }
+
+        try {
+            // Sync tasks
+            const tasks = Storage.getTasks();
+            if (tasks.length > 0) {
+                await DB.syncTasks(this.user.id, tasks);
+            }
+
+            // Update profile with stats
+            const stats = Storage.getStats();
+            await DB.updateProfile(this.user.id, {
+                total_points: stats.totalPoints,
+                total_tasks_completed: stats.completed,
+                total_time_spent: stats.totalTimeSpent,
+                current_rank: Storage.getRank(stats.totalPoints).name
+            });
+
+            // Sync completed tasks
+            const completed = Storage.getCompletedTasks();
+            for (const task of completed.slice(-50)) {
+                await DB.logCompleted(
+                    this.user.id,
+                    task.name,
+                    task.type,
+                    task.points,
+                    task.timeSpent
+                );
+            }
+
+            alert('Data synced to cloud!');
+        } catch (e) {
+            console.error('Sync error:', e);
+            alert('Sync failed: ' + e.message);
+        }
+    },
+
+    // Render groups screen
+    async renderGroups() {
+        const container = document.getElementById('groups-list');
+        const noGroups = document.getElementById('no-groups');
+
+        if (!this.isLoggedIn) {
+            container.classList.add('hidden');
+            noGroups.classList.remove('hidden');
+            noGroups.innerHTML = '<p>Sign in to create or join groups</p>';
+            return;
+        }
+
+        const { data: groups, error } = await DB.getMyGroups(this.user.id);
+
+        if (error || !groups || groups.length === 0) {
+            container.classList.add('hidden');
+            noGroups.classList.remove('hidden');
+            noGroups.innerHTML = `
+                <p>No groups yet!</p>
+                <p class="groups-hint">Create or join a group to compete on leaderboards.</p>
+            `;
+            return;
+        }
+
+        container.classList.remove('hidden');
+        noGroups.classList.add('hidden');
+
+        container.innerHTML = groups.map(group => `
+            <div class="group-item" data-id="${group.id}" data-code="${group.invite_code}">
+                <div class="group-item-name">${this.escapeHtml(group.name)}</div>
+                <div class="group-item-meta">${group.description || 'No description'}</div>
+            </div>
+        `).join('');
+
+        // Bind click events
+        container.querySelectorAll('.group-item').forEach(item => {
+            item.addEventListener('click', () => {
+                this.openLeaderboard(item.dataset.id, item.dataset.code);
+            });
+        });
+    },
+
+    // Create group
+    async createGroup() {
+        const name = document.getElementById('group-name').value.trim();
+        const desc = document.getElementById('group-desc').value.trim();
+
+        if (!name) return;
+
+        if (!this.isLoggedIn) {
+            document.getElementById('modal-create-group').classList.add('hidden');
+            this.showScreen('login');
+            return;
+        }
+
+        try {
+            const { data, error } = await DB.createGroup(this.user.id, name, desc);
+            if (error) throw error;
+
+            document.getElementById('group-name').value = '';
+            document.getElementById('group-desc').value = '';
+            document.getElementById('modal-create-group').classList.add('hidden');
+
+            this.renderGroups();
+        } catch (e) {
+            alert('Failed to create group: ' + e.message);
+        }
+    },
+
+    // Join group
+    async joinGroup() {
+        const code = document.getElementById('join-code').value.trim().toUpperCase();
+
+        if (!code || code.length !== 6) {
+            alert('Please enter a valid 6-character invite code');
+            return;
+        }
+
+        if (!this.isLoggedIn) {
+            document.getElementById('modal-join-group').classList.add('hidden');
+            this.showScreen('login');
+            return;
+        }
+
+        try {
+            const { data, error } = await DB.joinGroup(this.user.id, code);
+            if (error) throw error;
+
+            document.getElementById('join-code').value = '';
+            document.getElementById('modal-join-group').classList.add('hidden');
+
+            this.renderGroups();
+        } catch (e) {
+            alert('Failed to join group: ' + e.message);
+        }
+    },
+
+    // Open leaderboard for a group
+    async openLeaderboard(groupId, inviteCode) {
+        this.currentGroup = { id: groupId, invite_code: inviteCode };
+
+        document.getElementById('group-invite-code').textContent = inviteCode;
+
+        const container = document.getElementById('leaderboard-list');
+        const emptyEl = document.getElementById('leaderboard-empty');
+
+        container.innerHTML = '<div class="loading">Loading...</div>';
+        this.showScreen('leaderboard');
+
+        try {
+            const { data: leaderboard, error } = await DB.getLeaderboard(groupId);
+
+            if (error || !leaderboard || leaderboard.length === 0) {
+                container.classList.add('hidden');
+                emptyEl.classList.remove('hidden');
+                return;
+            }
+
+            container.classList.remove('hidden');
+            emptyEl.classList.add('hidden');
+
+            container.innerHTML = leaderboard.map((entry, index) => {
+                const isMe = entry.user_id === this.user?.id;
+                const initial = (entry.display_name?.[0] || '?').toUpperCase();
+
+                return `
+                    <div class="leaderboard-item${isMe ? ' is-me' : ''}">
+                        <div class="leaderboard-position">${index + 1}</div>
+                        <div class="leaderboard-avatar">
+                            ${entry.avatar_url
+                                ? `<img src="${entry.avatar_url}" alt="">`
+                                : `<span>${initial}</span>`}
+                        </div>
+                        <div class="leaderboard-info">
+                            <div class="leaderboard-name">${this.escapeHtml(entry.display_name || 'User')}</div>
+                            <div class="leaderboard-rank">${entry.current_rank || 'Task Newbie'}</div>
+                        </div>
+                        <div class="leaderboard-stats">
+                            <div class="leaderboard-points">${entry.weekly_points} pts</div>
+                            <div class="leaderboard-tasks">${entry.weekly_tasks} tasks</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        } catch (e) {
+            container.innerHTML = '<div class="error">Failed to load leaderboard</div>';
+        }
+    },
+
+    // Copy invite code
+    copyInviteCode() {
+        const code = document.getElementById('group-invite-code').textContent;
+        navigator.clipboard.writeText(code).then(() => {
+            const btn = document.getElementById('btn-copy-code');
+            btn.textContent = 'Copied!';
+            setTimeout(() => btn.textContent = 'Copy', 2000);
+        });
+    },
+
+    // Leave group
+    async leaveGroup() {
+        if (!this.currentGroup || !this.isLoggedIn) return;
+
+        if (!confirm('Leave this group?')) return;
+
+        try {
+            await DB.leaveGroup(this.user.id, this.currentGroup.id);
+            this.currentGroup = null;
+            this.renderGroups();
+            this.showScreen('groups');
+        } catch (e) {
+            alert('Failed to leave group: ' + e.message);
         }
     }
 };

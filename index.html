@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#6366f1">
+    <meta name="description" content="ADHD-friendly task decider - stop overthinking, start doing">
+
+    <title>What Now?</title>
+
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+    <link rel="apple-touch-icon" href="icons/icon.svg">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Home Screen -->
+        <div id="screen-home" class="screen active">
+            <div class="home-container">
+                <div id="rank-display" class="rank-display hidden">
+                    <div class="rank-badge">
+                        <span class="rank-title">Task Newbie</span>
+                    </div>
+                    <div class="rank-points">
+                        <span class="points-value">0</span> points
+                    </div>
+                    <div class="rank-progress">
+                        <div class="rank-progress-bar">
+                            <div class="rank-progress-fill" style="width: 0%"></div>
+                        </div>
+                        <span class="rank-next">Next: Task Apprentice</span>
+                    </div>
+                </div>
+
+                <h1 class="app-title">What Now?</h1>
+                <p class="app-subtitle">Stop overthinking. Start doing.</p>
+
+                <div class="home-buttons">
+                    <button id="btn-add-task" class="btn btn-primary btn-large">
+                        Add Task
+                    </button>
+                    <button id="btn-what-next" class="btn btn-secondary btn-large">
+                        What Next
+                    </button>
+                </div>
+
+                <button id="btn-manage-tasks" class="btn btn-text">
+                    Manage Tasks
+                </button>
+                <button id="btn-gallery" class="btn btn-text">
+                    Completed Gallery
+                </button>
+            </div>
+        </div>
+
+        <!-- Completed Gallery Screen -->
+        <div id="screen-gallery" class="screen">
+            <div class="screen-header">
+                <button class="btn-back" data-back="home">←</button>
+                <h2>Completed Tasks</h2>
+            </div>
+            <div class="screen-content">
+                <div id="gallery-stats" class="gallery-stats">
+                    <div class="gallery-stat">
+                        <div class="gallery-stat-value" id="gallery-total-tasks">0</div>
+                        <div class="gallery-stat-label">Tasks Done</div>
+                    </div>
+                    <div class="gallery-stat">
+                        <div class="gallery-stat-value" id="gallery-total-points">0</div>
+                        <div class="gallery-stat-label">Points Earned</div>
+                    </div>
+                    <div class="gallery-stat">
+                        <div class="gallery-stat-value" id="gallery-total-time">0h</div>
+                        <div class="gallery-stat-label">Time Spent</div>
+                    </div>
+                </div>
+                <div id="gallery-comparison" class="gallery-comparison hidden">
+                    <!-- Fun comparison text -->
+                </div>
+                <div id="gallery-grid" class="gallery-grid">
+                    <!-- Sticker bomb style completed tasks -->
+                </div>
+                <div id="no-completed" class="no-tasks hidden">
+                    <p>No completed tasks yet!</p>
+                    <p class="gallery-hint">Complete some tasks to see them here.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Task Screen - Step 1: Task Type -->
+        <div id="screen-add-type" class="screen">
+            <div class="screen-header">
+                <button class="btn-back" data-back="home">←</button>
+                <h2>What type of task?</h2>
+                <div class="step-indicator">1 of 6</div>
+            </div>
+            <div class="screen-content">
+                <div class="add-options-row">
+                    <button id="btn-from-template" class="btn btn-secondary btn-add-option hidden">
+                        Saved Tasks
+                    </button>
+                    <button id="btn-multi-add" class="btn btn-secondary btn-add-option">
+                        Multiple
+                    </button>
+                    <button id="btn-import" class="btn btn-secondary btn-add-option">
+                        Import
+                    </button>
+                </div>
+                <div id="task-types" class="option-grid">
+                    <!-- Populated by JS -->
+                </div>
+                <button id="btn-add-custom-type" class="btn btn-outline btn-small">
+                    + Add Custom Type
+                </button>
+            </div>
+        </div>
+
+        <!-- Template Selection Screen -->
+        <div id="screen-templates" class="screen">
+            <div class="screen-header">
+                <button class="btn-back" data-back="add-type">←</button>
+                <h2>Saved Tasks</h2>
+            </div>
+            <div class="screen-content">
+                <p class="template-hint">Pick a template to pre-fill your task</p>
+                <div id="template-list" class="template-list">
+                    <!-- Populated by JS -->
+                </div>
+                <div id="no-templates" class="no-tasks hidden">
+                    <p>No saved templates yet.</p>
+                    <p class="template-hint">Save a template when creating a new task.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Multi-Add: Type Selection -->
+        <div id="screen-multi-type" class="screen">
+            <div class="screen-header">
+                <button class="btn-back" data-back="add-type">←</button>
+                <h2>Add Multiple Tasks</h2>
+                <div class="step-indicator">1 of 5</div>
+            </div>
+            <div class="screen-content">
+                <p class="multi-hint">Add up to 5 tasks that share the same settings</p>
+                <div id="multi-task-types" class="option-grid">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Multi-Add: Time -->
+        <div id="screen-multi-time" class="screen">
+            <div class="screen-header">
+                <button class="btn-back" data-back="multi-type">←</button>
+                <h2>How long will they take?</h2>
+                <div class="step-indicator">2 of 5</div>
+            </div>
+            <div class="screen-content">
+                <div class="option-grid">
+                    <button class="option-btn multi-time-option" data-value="5">5 min</button>
+                    <button class="option-btn multi-time-option" data-value="15">15 min</button>
+                    <button class="option-btn multi-time-option" data-value="30">30 min</button>
+                    <button class="option-btn multi-time-option" data-value="60">1 hour+</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Multi-Add: Social -->
+        <div id="screen-multi-social" class="screen">
+            <div class="screen-header">
+                <button class="btn-back" data-back="multi-time">←</button>
+                <h2>Social battery needed?</h2>
+                <div class="step-indicator">3 of 5</div>
+            </div>
+            <div class="screen-content">
+                <div class="option-list">
+                    <button class="option-btn level-option multi-social-option" data-value="low">
+                        <span class="level-icon">🔋</span>
+                        <span class="level-label">Low</span>
+                        <span class="level-desc">Solo, no interaction</span>
+                    </button>
+                    <button class="option-btn level-option multi-social-option" data-value="medium">
+                        <span class="level-icon">🔋🔋</span>
+                        <span class="level-label">Medium</span>
+                        <span class="level-desc">Some interaction</span>
+                    </button>
+                    <button class="option-btn level-option multi-social-option" data-value="high">
+                        <span class="level-icon">🔋🔋🔋</span>
+                        <span class="level-label">High</span>
+                        <span class="level-desc">Lots of people</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Multi-Add: Energy -->
+        <div id="screen-multi-energy" class="screen">
+            <div class="screen-header">
+                <button class="btn-back" data-back="multi-social">←</button>
+                <h2>Energy level needed?</h2>
+                <div class="step-indicator">4 of 5</div>
+            </div>
+            <div class="screen-content">
+                <div class="option-list">
+                    <button class="option-btn level-option multi-energy-option" data-value="low">
+                        <span class="level-icon">⚡</span>
+                        <span class="level-label">Low</span>
+                        <span class="level-desc">Can do while tired</span>
+                    </button>
+                    <button class="option-btn level-option multi-energy-option" data-value="medium">
+                        <span class="level-icon">⚡⚡</span>
+                        <span class="level-label">Medium</span>
+                        <span class="level-desc">Need some focus</span>
+                    </button>
+                    <button class="option-btn level-option multi-energy-option" data-value="high">
+                        <span class="level-icon">⚡⚡⚡</span>
+                        <span class="level-label">High</span>
+                        <span class="level-desc">Need full power</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Multi-Add: Names -->
+        <div id="screen-multi-names" class="screen">
+            <div class="screen-header">
+                <button class="btn-back" data-back="multi-energy">←</button>
+                <h2>Name your tasks</h2>
+                <div class="step-indicator">5 of 5</div>
+            </div>
+            <div class="screen-content">
+                <div class="multi-names-list">
+                    <div class="form-group">
+                        <input type="text" class="multi-task-name" placeholder="Task 1" maxlength="50">
+                    </div>
+                    <div class="form-group">
+                        <input type="text" class="multi-task-name" placeholder="Task 2" maxlength="50">
+                    </div>
+                    <div class="form-group">
+                        <input type="text" class="multi-task-name" placeholder="Task 3" maxlength="50">
+                    </div>
+                    <div class="form-group">
+                        <input type="text" class="multi-task-name" placeholder="Task 4" maxlength="50">
+                    </div>
+                    <div class="form-group">
+                        <input type="text" class="multi-task-name" placeholder="Task 5" maxlength="50">
+                    </div>
+                </div>
+                <button id="btn-save-multi" class="btn btn-primary btn-large">
+                    Save All Tasks
+                </button>
+            </div>
+        </div>
+
+        <!-- Import Screen -->
+        <div id="screen-import" class="screen">
+            <div class="screen-header">
+                <button class="btn-back" data-back="add-type">←</button>
+                <h2>Import Tasks</h2>
+            </div>
+            <div class="screen-content">
+                <p class="import-hint">Paste a list of tasks or import a file. Supports plain text, Apple Notes, and CSV.</p>
+                <div class="form-group">
+                    <textarea id="import-text" placeholder="- Task 1&#10;- Task 2&#10;- Task 3" rows="8"></textarea>
+                </div>
+                <div class="import-actions">
+                    <label class="btn btn-outline import-file-btn">
+                        Upload File
+                        <input type="file" id="import-file" accept=".txt,.csv,.html" hidden>
+                    </label>
+                    <button id="btn-parse-import" class="btn btn-primary">
+                        Parse Tasks
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Import Review Screen -->
+        <div id="screen-import-review" class="screen">
+            <div class="screen-header">
+                <button class="btn-back" data-back="import">←</button>
+                <h2>Review Imports</h2>
+            </div>
+            <div class="screen-content">
+                <p class="import-hint">Found <span id="import-count">0</span> tasks. Each needs settings before saving.</p>
+                <div id="pending-import-list" class="pending-import-list">
+                    <!-- Populated by JS -->
+                </div>
+                <div id="no-pending-imports" class="no-tasks hidden">
+                    <p>All imports processed!</p>
+                </div>
+                <button id="btn-finish-import" class="btn btn-primary btn-large hidden">
+                    Back to Home
+                </button>
+            </div>
+        </div>
+
+        <!-- Import Task Setup Screen -->
+        <div id="screen-import-setup" class="screen">
+            <div class="screen-header">
+                <button class="btn-back" id="btn-import-setup-back">←</button>
+                <h2>Setup Task</h2>
+            </div>
+            <div class="screen-content">
+                <div class="import-task-preview">
+                    <div id="import-task-name" class="import-task-name">Task name</div>
+                </div>
+                <div class="form-group">
+                    <label>Task type</label>
+                    <div id="import-task-types" class="option-grid option-grid-small">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Time required</label>
+                    <div class="option-row">
+                        <button class="option-btn import-time-option" data-value="5">5 min</button>
+                        <button class="option-btn import-time-option" data-value="15">15 min</button>
+                        <button class="option-btn import-time-option" data-value="30">30 min</button>
+                        <button class="option-btn import-time-option" data-value="60">1 hr+</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Social battery</label>
+                    <div class="option-row">
+                        <button class="option-btn import-social-option" data-value="low">Low</button>
+                        <button class="option-btn import-social-option" data-value="medium">Medium</button>
+                        <button class="option-btn import-social-option" data-value="high">High</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Energy level</label>
+                    <div class="option-row">
+                        <button class="option-btn import-energy-option" data-value="low">Low</button>
+                        <button class="option-btn import-energy-option" data-value="medium">Medium</button>
+                        <button class="option-btn import-energy-option" data-value="high">High</button>
+                    </div>
+                </div>
+                <button id="btn-save-import-task" class="btn btn-primary btn-large" disabled>
+                    Save Task
+                </button>
+            </div>
+        </div>
+
+        <!-- Add Task Screen - Step 2: Time Required -->
+        <div id="screen-add-time" class="screen">
+            <div class="screen-header">
+                <button class="btn-back" data-back="add-type">←</button>
+                <h2>How long will it take?</h2>
+                <div class="step-indicator">2 of 6</div>
+            </div>
+            <div class="screen-content">
+                <div class="option-grid">
+                    <button class="option-btn time-option" data-value="5">5 min</button>
+                    <button class="option-btn time-option" data-value="15">15 min</button>
+                    <button class="option-btn time-option" data-value="30">30 min</button>
+                    <button class="option-btn time-option" data-value="60">1 hour+</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Task Screen - Step 3: Social Battery -->
+        <div id="screen-add-social" class="screen">
+            <div class="screen-header">
+                <button class="btn-back" data-back="add-time">←</button>
+                <h2>Social battery needed?</h2>
+                <div class="step-indicator">3 of 6</div>
+            </div>
+            <div class="screen-content">
+                <div class="option-list">
+                    <button class="option-btn level-option" data-value="low">
+                        <span class="level-icon">🔋</span>
+                        <span class="level-label">Low</span>
+                        <span class="level-desc">Solo, no interaction</span>
+                    </button>
+                    <button class="option-btn level-option" data-value="medium">
+                        <span class="level-icon">🔋🔋</span>
+                        <span class="level-label">Medium</span>
+                        <span class="level-desc">Some interaction</span>
+                    </button>
+                    <button class="option-btn level-option" data-value="high">
+                        <span class="level-icon">🔋🔋🔋</span>
+                        <span class="level-label">High</span>
+                        <span class="level-desc">Lots of people</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Task Screen - Step 4: Energy Level -->
+        <div id="screen-add-energy" class="screen">
+            <div class="screen-header">
+                <button class="btn-back" data-back="add-social">←</button>
+                <h2>Energy level needed?</h2>
+                <div class="step-indicator">4 of 6</div>
+            </div>
+            <div class="screen-content">
+                <div class="option-list">
+                    <button class="option-btn level-option" data-value="low">
+                        <span class="level-icon">⚡</span>
+                        <span class="level-label">Low</span>
+                        <span class="level-desc">Can do while tired</span>
+                    </button>
+                    <button class="option-btn level-option" data-value="medium">
+                        <span class="level-icon">⚡⚡</span>
+                        <span class="level-label">Medium</span>
+                        <span class="level-desc">Need some focus</span>
+                    </button>
+                    <button class="option-btn level-option" data-value="high">
+                        <span class="level-icon">⚡⚡⚡</span>
+                        <span class="level-label">High</span>
+                        <span class="level-desc">Need full power</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Task Screen - Step 5: Name & Description -->
+        <div id="screen-add-details" class="screen">
+            <div class="screen-header">
+                <button class="btn-back" data-back="add-energy">←</button>
+                <h2>Name your task</h2>
+                <div class="step-indicator">5 of 6</div>
+            </div>
+            <div class="screen-content">
+                <div class="form-group">
+                    <label for="task-name">Task name</label>
+                    <input type="text" id="task-name" placeholder="e.g., Clean the kitchen" maxlength="50">
+                </div>
+                <div class="form-group">
+                    <label for="task-desc">Brief description (optional)</label>
+                    <textarea id="task-desc" placeholder="Any extra details..." rows="3" maxlength="150"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="save-as-template">
+                        <span class="checkbox-text">Save as template for reuse</span>
+                    </label>
+                </div>
+                <button id="btn-next-to-schedule" class="btn btn-primary btn-large">
+                    Next
+                </button>
+            </div>
+        </div>
+
+        <!-- Add Task Screen - Step 6: Due Date & Recurring -->
+        <div id="screen-add-schedule" class="screen">
+            <div class="screen-header">
+                <button class="btn-back" data-back="add-details">←</button>
+                <h2>When is it due?</h2>
+                <div class="step-indicator">6 of 6</div>
+            </div>
+            <div class="screen-content">
+                <div class="form-group">
+                    <label for="task-due-date">Due date (optional)</label>
+                    <input type="date" id="task-due-date">
+                </div>
+                <div class="form-group">
+                    <label>Repeat</label>
+                    <div class="option-row">
+                        <button class="option-btn recurring-option selected" data-value="none">None</button>
+                        <button class="option-btn recurring-option" data-value="daily">Daily</button>
+                        <button class="option-btn recurring-option" data-value="weekly">Weekly</button>
+                        <button class="option-btn recurring-option" data-value="monthly">Monthly</button>
+                    </div>
+                </div>
+                <button id="btn-save-task" class="btn btn-primary btn-large">
+                    Save Task
+                </button>
+                <button id="btn-skip-schedule" class="btn btn-text">
+                    Skip for now
+                </button>
+            </div>
+        </div>
+
+        <!-- What Next Screen - Step 1: Current State -->
+        <div id="screen-state" class="screen">
+            <div class="screen-header">
+                <button class="btn-back" data-back="home">←</button>
+                <h2>How are you feeling?</h2>
+            </div>
+            <div class="screen-content">
+                <div class="state-section">
+                    <h3>Energy level right now</h3>
+                    <div class="option-row">
+                        <button class="option-btn state-btn" data-type="energy" data-value="low">Low</button>
+                        <button class="option-btn state-btn" data-type="energy" data-value="medium">Medium</button>
+                        <button class="option-btn state-btn" data-type="energy" data-value="high">High</button>
+                    </div>
+                </div>
+                <div class="state-section">
+                    <h3>Social battery right now</h3>
+                    <div class="option-row">
+                        <button class="option-btn state-btn" data-type="social" data-value="low">Low</button>
+                        <button class="option-btn state-btn" data-type="social" data-value="medium">Medium</button>
+                        <button class="option-btn state-btn" data-type="social" data-value="high">High</button>
+                    </div>
+                </div>
+                <div class="state-section">
+                    <h3>Time available</h3>
+                    <div class="option-row">
+                        <button class="option-btn state-btn" data-type="time" data-value="5">5 min</button>
+                        <button class="option-btn state-btn" data-type="time" data-value="15">15 min</button>
+                        <button class="option-btn state-btn" data-type="time" data-value="30">30 min</button>
+                        <button class="option-btn state-btn" data-type="time" data-value="60">1 hr+</button>
+                    </div>
+                </div>
+                <button id="btn-find-task" class="btn btn-primary btn-large" disabled>
+                    Find Me a Task
+                </button>
+            </div>
+        </div>
+
+        <!-- What Next Screen - Step 2: Swipe Cards -->
+        <div id="screen-swipe" class="screen">
+            <div class="screen-header">
+                <button class="btn-back" data-back="home">←</button>
+                <h2>Swipe to decide</h2>
+            </div>
+            <div class="swipe-container">
+                <div id="card-stack" class="card-stack">
+                    <!-- Cards populated by JS -->
+                </div>
+                <div class="swipe-instructions">
+                    <span class="swipe-left">← Skip</span>
+                    <span class="swipe-right">Do it →</span>
+                </div>
+            </div>
+            <div id="no-tasks-message" class="no-tasks hidden">
+                <p>No more tasks to show!</p>
+                <button class="btn btn-primary" data-back="home">Back Home</button>
+            </div>
+        </div>
+
+        <!-- Task Accepted Screen -->
+        <div id="screen-accepted" class="screen">
+            <div class="accepted-container">
+                <div class="accepted-icon">✓</div>
+                <h2>Let's do it!</h2>
+                <div id="accepted-task" class="accepted-task">
+                    <!-- Populated by JS -->
+                </div>
+                <div class="accepted-buttons">
+                    <button id="btn-start-timer" class="btn btn-primary btn-large">Start Timer</button>
+                    <button id="btn-done" class="btn btn-secondary btn-large">Mark as Done</button>
+                    <button id="btn-not-now" class="btn btn-outline">Not now</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Timer Screen -->
+        <div id="screen-timer" class="screen">
+            <div class="timer-container">
+                <h2 class="timer-task-name">Task Name</h2>
+                <div class="timer-display">
+                    <span id="timer-minutes">00</span>:<span id="timer-seconds">00</span>
+                </div>
+                <div class="timer-controls">
+                    <button id="btn-timer-pause" class="btn btn-secondary btn-large">Pause</button>
+                    <button id="btn-timer-done" class="btn btn-primary btn-large">Done!</button>
+                </div>
+                <button id="btn-timer-cancel" class="btn btn-text">Cancel</button>
+            </div>
+        </div>
+
+        <!-- Celebration Screen -->
+        <div id="screen-celebration" class="screen">
+            <div class="celebration-container">
+                <canvas id="confetti-canvas"></canvas>
+                <div class="celebration-content">
+                    <div class="celebration-icon">🎉</div>
+                    <h2 class="celebration-title">Amazing!</h2>
+                    <div class="celebration-points">
+                        <span class="points-earned">+25</span>
+                        <span class="points-label">points</span>
+                    </div>
+                    <p class="celebration-message">Keep up the great work!</p>
+                    <div class="celebration-rank-up hidden">
+                        <div class="rank-up-badge">Level Up!</div>
+                        <div class="rank-up-title">Task Apprentice</div>
+                    </div>
+                    <button id="btn-celebration-done" class="btn btn-primary btn-large">Continue</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Manage Tasks Screen -->
+        <div id="screen-manage" class="screen">
+            <div class="screen-header">
+                <button class="btn-back" data-back="home">←</button>
+                <h2>Your Tasks</h2>
+            </div>
+            <div class="screen-content">
+                <div id="task-list" class="task-list">
+                    <!-- Populated by JS -->
+                </div>
+                <div id="no-tasks-yet" class="no-tasks hidden">
+                    <p>No tasks yet. Add some!</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Task Screen -->
+        <div id="screen-edit-task" class="screen">
+            <div class="screen-header">
+                <button class="btn-back" id="btn-edit-back">←</button>
+                <h2>Edit Task</h2>
+            </div>
+            <div class="screen-content">
+                <div class="form-group">
+                    <label for="edit-task-name">Task name</label>
+                    <input type="text" id="edit-task-name" placeholder="e.g., Clean the kitchen" maxlength="50">
+                </div>
+                <div class="form-group">
+                    <label for="edit-task-desc">Brief description (optional)</label>
+                    <textarea id="edit-task-desc" placeholder="Any extra details..." rows="3" maxlength="150"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Task type</label>
+                    <div id="edit-task-types" class="option-grid option-grid-small">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Time required</label>
+                    <div class="option-row">
+                        <button class="option-btn edit-time-option" data-value="5">5 min</button>
+                        <button class="option-btn edit-time-option" data-value="15">15 min</button>
+                        <button class="option-btn edit-time-option" data-value="30">30 min</button>
+                        <button class="option-btn edit-time-option" data-value="60">1 hr+</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Social battery needed</label>
+                    <div class="option-row">
+                        <button class="option-btn edit-social-option" data-value="low">Low</button>
+                        <button class="option-btn edit-social-option" data-value="medium">Medium</button>
+                        <button class="option-btn edit-social-option" data-value="high">High</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Energy level needed</label>
+                    <div class="option-row">
+                        <button class="option-btn edit-energy-option" data-value="low">Low</button>
+                        <button class="option-btn edit-energy-option" data-value="medium">Medium</button>
+                        <button class="option-btn edit-energy-option" data-value="high">High</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="edit-task-due-date">Due date (optional)</label>
+                    <input type="date" id="edit-task-due-date">
+                </div>
+                <div class="form-group">
+                    <label>Repeat</label>
+                    <div class="option-row">
+                        <button class="option-btn edit-recurring-option" data-value="none">None</button>
+                        <button class="option-btn edit-recurring-option" data-value="daily">Daily</button>
+                        <button class="option-btn edit-recurring-option" data-value="weekly">Weekly</button>
+                        <button class="option-btn edit-recurring-option" data-value="monthly">Monthly</button>
+                    </div>
+                </div>
+                <div class="edit-buttons">
+                    <button id="btn-update-task" class="btn btn-primary btn-large">
+                        Save Changes
+                    </button>
+                    <button id="btn-delete-task" class="btn btn-outline btn-danger-text">
+                        Delete Task
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Custom Type Modal -->
+        <div id="modal-custom-type" class="modal hidden">
+            <div class="modal-content">
+                <h3>Add Custom Type</h3>
+                <input type="text" id="custom-type-input" placeholder="Type name" maxlength="20">
+                <div class="modal-buttons">
+                    <button id="btn-cancel-type" class="btn btn-outline">Cancel</button>
+                    <button id="btn-confirm-type" class="btn btn-primary">Add</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/storage.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        // Register Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then((reg) => console.log('SW registered'))
+                    .catch((err) => console.log('SW registration failed:', err));
+            });
+        }
+    </script>
+</body>
+</html>

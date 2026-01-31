@@ -1,0 +1,20 @@
+{
+    "name": "What Now?",
+    "short_name": "What Now?",
+    "description": "ADHD-friendly task decider - stop overthinking, start doing",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#0f0f1a",
+    "theme_color": "#6366f1",
+    "orientation": "portrait",
+    "icons": [
+        {
+            "src": "icons/icon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any"
+        }
+    ],
+    "categories": ["productivity", "lifestyle"],
+    "lang": "en"
+}

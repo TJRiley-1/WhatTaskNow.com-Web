@@ -1,0 +1,25 @@
+{
+  "name": "whatnow",
+  "version": "1.0.0",
+  "description": "",
+  "main": "sw.js",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:headed": "playwright test --headed"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TJRiley-1/whatnow.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/TJRiley-1/whatnow/issues"
+  },
+  "homepage": "https://github.com/TJRiley-1/whatnow#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.58.1"
+  }
+}

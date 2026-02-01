@@ -1,5 +1,5 @@
 // Service Worker for What Now? PWA
-const CACHE_NAME = 'whatnow-com-v4';
+const CACHE_NAME = 'whatnow-com-v5';
 const ASSETS = [
     '/',
     '/index.html',
@@ -32,13 +32,30 @@ self.addEventListener('activate', (event) => {
     );
 });
 
-// Fetch - serve from cache, fallback to network
+// Fetch - network-first for JS, cache-first for other assets
 self.addEventListener('fetch', (event) => {
+    const url = new URL(event.request.url);
+
+    // Network-first for JS files (ensures updates load immediately)
+    if (url.pathname.endsWith('.js')) {
+        event.respondWith(
+            fetch(event.request)
+                .then((response) => {
+                    // Update cache with new version
+                    const clone = response.clone();
+                    caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+                    return response;
+                })
+                .catch(() => caches.match(event.request))
+        );
+        return;
+    }
+
+    // Cache-first for other assets
     event.respondWith(
         caches.match(event.request)
             .then((response) => response || fetch(event.request))
             .catch(() => {
-                // Offline fallback for navigation
                 if (event.request.mode === 'navigate') {
                     return caches.match('/index.html');
                 }

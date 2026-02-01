@@ -1,10 +1,11 @@
 // Service Worker for What Now? PWA
-const CACHE_NAME = 'whatnow-com-v1';
+const CACHE_NAME = 'whatnow-com-v2';
 const ASSETS = [
     '/',
     '/index.html',
     '/css/style.css',
     '/js/storage.js',
+    '/js/supabase.js',
     '/js/app.js',
     '/manifest.json',
     '/icons/icon.svg'

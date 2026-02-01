@@ -50,21 +50,38 @@ const Supabase = {
 
         if (!response.ok) {
             const error = await response.json().catch(() => ({ message: response.statusText }));
-            throw new Error(error.message || error.error_description || 'Request failed');
+            const errorMsg = error.error_description || error.message || error.msg || 'Request failed';
+            // Provide more user-friendly error messages
+            if (errorMsg.includes('Invalid login credentials')) {
+                throw new Error('Invalid email or password');
+            }
+            if (errorMsg.includes('Email not confirmed')) {
+                throw new Error('Please confirm your email before signing in');
+            }
+            if (errorMsg.includes('User already registered')) {
+                throw new Error('An account with this email already exists');
+            }
+            throw new Error(errorMsg);
         }
 
         return response.json();
     },
 
     // Auth: Sign up with email
-    async signUp(email, password) {
+    async signUp(email, password, displayName = null) {
+        const body = {
+            email,
+            password,
+            data: displayName ? { full_name: displayName } : {}
+        };
+
         const data = await this.request('/auth/v1/signup', {
             method: 'POST',
-            body: JSON.stringify({ email, password })
+            body: JSON.stringify(body)
         });
 
         if (data.access_token) {
-            this.setSession(data);
+            await this.setSession(data);
         }
         return data;
     },
@@ -77,14 +94,19 @@ const Supabase = {
         });
 
         if (data.access_token) {
-            this.setSession(data);
+            await this.setSession(data);
         }
         return data;
     },
 
     // Auth: Sign in with OAuth (Google)
     async signInWithGoogle() {
-        const redirectTo = window.location.origin + window.location.pathname;
+        // Use current origin, ensuring we don't redirect to localhost in production
+        let redirectTo = window.location.origin;
+        // Remove trailing slash and add pathname
+        if (window.location.pathname && window.location.pathname !== '/') {
+            redirectTo += window.location.pathname.replace(/\/$/, '');
+        }
         const url = `${this.url}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectTo)}`;
         window.location.href = url;
     },
@@ -99,7 +121,7 @@ const Supabase = {
             const expires_in = params.get('expires_in');
 
             if (access_token) {
-                this.setSession({
+                await this.setSession({
                     access_token,
                     refresh_token,
                     expires_in: parseInt(expires_in),
@@ -126,7 +148,7 @@ const Supabase = {
             });
 
             if (data.access_token) {
-                this.setSession(data);
+                await this.setSession(data);
             }
             return this.user;
         } catch (e) {
@@ -161,7 +183,7 @@ const Supabase = {
     },
 
     // Session management
-    setSession(data) {
+    async setSession(data) {
         this.session = {
             access_token: data.access_token,
             refresh_token: data.refresh_token,
@@ -172,7 +194,7 @@ const Supabase = {
 
         // Get user info if not included
         if (!this.user) {
-            this.getUser();
+            await this.getUser();
         }
     },
 

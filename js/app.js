@@ -1558,6 +1558,12 @@ const App = {
 
     // Email login
     async emailLogin() {
+        // If in signup mode, toggle back to login mode
+        if (this.isSignupMode) {
+            this.toggleSignupMode(false);
+            return;
+        }
+
         const email = document.getElementById('login-email').value.trim();
         const password = document.getElementById('login-password').value;
         const errorEl = document.getElementById('login-error');
@@ -1577,12 +1583,49 @@ const App = {
             this.showScreen('home');
         } catch (e) {
             errorEl.textContent = e.message || 'Login failed';
+            errorEl.style.color = '';
             errorEl.classList.remove('hidden');
+        }
+    },
+
+    // Toggle signup mode (show/hide name field)
+    isSignupMode: false,
+
+    toggleSignupMode(showSignup) {
+        this.isSignupMode = showSignup;
+        const nameField = document.getElementById('name-field');
+        const loginBtn = document.getElementById('btn-email-login');
+        const signupBtn = document.getElementById('btn-email-signup');
+
+        if (showSignup) {
+            nameField.classList.remove('hidden');
+            loginBtn.textContent = 'Back to Sign In';
+            signupBtn.textContent = 'Create Account';
+            signupBtn.classList.add('btn-primary');
+            signupBtn.classList.remove('btn-outline');
+            loginBtn.classList.remove('btn-primary');
+            loginBtn.classList.add('btn-outline');
+        } else {
+            nameField.classList.add('hidden');
+            loginBtn.textContent = 'Sign In';
+            signupBtn.textContent = 'Create Account';
+            loginBtn.classList.add('btn-primary');
+            loginBtn.classList.remove('btn-outline');
+            signupBtn.classList.remove('btn-primary');
+            signupBtn.classList.add('btn-outline');
         }
     },
 
     // Email signup
     async emailSignup() {
+        // If not in signup mode, toggle to signup mode
+        if (!this.isSignupMode) {
+            this.toggleSignupMode(true);
+            document.getElementById('login-name').focus();
+            return;
+        }
+
+        const name = document.getElementById('login-name').value.trim();
         const email = document.getElementById('login-email').value.trim();
         const password = document.getElementById('login-password').value;
         const errorEl = document.getElementById('login-error');
@@ -1601,13 +1644,24 @@ const App = {
 
         try {
             errorEl.classList.add('hidden');
-            await Supabase.signUp(email, password);
+            const data = await Supabase.signUp(email, password, name || null);
+
+            // Check if email confirmation is required
+            if (data.id && !data.access_token) {
+                errorEl.textContent = 'Please check your email to confirm your account';
+                errorEl.style.color = '#4ade80';
+                errorEl.classList.remove('hidden');
+                this.toggleSignupMode(false);
+                return;
+            }
+
             this.isLoggedIn = true;
             await this.loadProfile();
             this.updateAuthUI();
             this.showScreen('home');
         } catch (e) {
             errorEl.textContent = e.message || 'Signup failed';
+            errorEl.style.color = '';
             errorEl.classList.remove('hidden');
         }
     },

@@ -1423,11 +1423,20 @@ const App = {
 
     // Bind auth events
     bindAuthEvents() {
-        // Login screen
+        // Login screen - OAuth providers
         document.getElementById('btn-google-login').addEventListener('click', () => {
             Supabase.signInWithGoogle();
         });
 
+        document.getElementById('btn-facebook-login').addEventListener('click', () => {
+            Supabase.signInWithFacebook();
+        });
+
+        document.getElementById('btn-apple-login').addEventListener('click', () => {
+            Supabase.signInWithApple();
+        });
+
+        // Login screen - Email
         document.getElementById('btn-email-login').addEventListener('click', () => {
             this.emailLogin();
         });

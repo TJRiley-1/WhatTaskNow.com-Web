@@ -1166,6 +1166,48 @@ body {
     flex-shrink: 0;
 }
 
+.btn-facebook {
+    background: #1877F2;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+}
+
+.btn-facebook:hover {
+    background: #166FE5;
+}
+
+.facebook-icon {
+    flex-shrink: 0;
+}
+
+.btn-apple {
+    background: #000000;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+}
+
+.btn-apple:hover {
+    background: #333333;
+}
+
+.apple-icon {
+    flex-shrink: 0;
+}
+
+.login-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
 .login-divider {
     display: flex;
     align-items: center;

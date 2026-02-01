@@ -108,13 +108,26 @@ const Supabase = {
 
     // Auth: Sign in with OAuth (Google)
     async signInWithGoogle() {
-        // Use current origin, ensuring we don't redirect to localhost in production
+        this.signInWithOAuth('google');
+    },
+
+    // Auth: Sign in with OAuth (Facebook)
+    async signInWithFacebook() {
+        this.signInWithOAuth('facebook');
+    },
+
+    // Auth: Sign in with OAuth (Apple)
+    async signInWithApple() {
+        this.signInWithOAuth('apple');
+    },
+
+    // Auth: Generic OAuth sign-in
+    signInWithOAuth(provider) {
         let redirectTo = window.location.origin;
-        // Remove trailing slash and add pathname
         if (window.location.pathname && window.location.pathname !== '/') {
             redirectTo += window.location.pathname.replace(/\/$/, '');
         }
-        const url = `${this.url}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectTo)}`;
+        const url = `${this.url}/auth/v1/authorize?provider=${provider}&redirect_to=${encodeURIComponent(redirectTo)}`;
         window.location.href = url;
     },
 

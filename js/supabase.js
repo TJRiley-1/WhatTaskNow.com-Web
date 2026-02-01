@@ -13,19 +13,26 @@ const Supabase = {
 
     // Initialize
     async init() {
-        // Check for existing session
-        const storedSession = localStorage.getItem('supabase_session');
-        if (storedSession) {
-            try {
-                this.session = JSON.parse(storedSession);
-                await this.refreshSession();
-            } catch (e) {
-                this.clearSession();
+        // Check for OAuth callback FIRST (before restoring old session)
+        await this.handleAuthCallback();
+
+        // If no session from callback, check for existing session
+        if (!this.session) {
+            const storedSession = localStorage.getItem('supabase_session');
+            if (storedSession) {
+                try {
+                    this.session = JSON.parse(storedSession);
+                    await this.refreshSession();
+                } catch (e) {
+                    this.clearSession();
+                }
             }
         }
 
-        // Check for OAuth callback
-        await this.handleAuthCallback();
+        // Ensure we have user data if we have a session
+        if (this.session && !this.user) {
+            await this.getUser();
+        }
 
         return this.user;
     },

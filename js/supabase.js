@@ -128,7 +128,14 @@ const Supabase = {
     // Auth: Handle OAuth callback
     async handleAuthCallback() {
         const hash = window.location.hash;
-        console.log('[Auth] Checking for OAuth callback, hash:', hash ? 'present' : 'none');
+        console.log('[Auth] Checking for OAuth callback, hash:', hash);
+
+        // Check for error in hash
+        if (hash && hash.includes('error')) {
+            const params = new URLSearchParams(hash.substring(1));
+            console.error('[Auth] OAuth error:', params.get('error'), params.get('error_description'));
+            return;
+        }
 
         if (hash && hash.includes('access_token')) {
             console.log('[Auth] Found access_token in hash, processing...');

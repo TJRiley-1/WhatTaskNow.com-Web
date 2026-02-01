@@ -1441,8 +1441,16 @@ const App = {
         });
 
         // Profile screen
-        document.getElementById('btn-sync-data').addEventListener('click', () => {
-            this.syncToCloud();
+        document.getElementById('btn-edit-profile').addEventListener('click', () => {
+            this.openEditProfile();
+        });
+
+        document.getElementById('btn-cancel-edit-profile').addEventListener('click', () => {
+            document.getElementById('modal-edit-profile').classList.add('hidden');
+        });
+
+        document.getElementById('btn-save-profile').addEventListener('click', () => {
+            this.saveProfile();
         });
 
         document.getElementById('btn-view-groups').addEventListener('click', () => {
@@ -1499,16 +1507,16 @@ const App = {
     updateAuthUI() {
         const logoutBtn = document.getElementById('btn-logout');
         const loginBtn = document.getElementById('btn-login-from-profile');
-        const syncBtn = document.getElementById('btn-sync-data');
+        const editProfileBtn = document.getElementById('btn-edit-profile');
 
         if (this.isLoggedIn) {
             logoutBtn.classList.remove('hidden');
             loginBtn.classList.add('hidden');
-            syncBtn.classList.remove('hidden');
+            editProfileBtn.classList.remove('hidden');
         } else {
             logoutBtn.classList.add('hidden');
             loginBtn.classList.remove('hidden');
-            syncBtn.classList.add('hidden');
+            editProfileBtn.classList.add('hidden');
         }
     },
 
@@ -1520,10 +1528,27 @@ const App = {
 
         if (Supabase.user) {
             this.user = Supabase.user;
-            const { data } = await DB.getProfile(this.user.id);
+            const { data, error } = await DB.getProfile(this.user.id);
+
             if (data && data[0]) {
                 this.profile = data[0];
+            } else {
+                // Profile doesn't exist, create one using Google metadata
+                const displayName = this.user.user_metadata?.full_name ||
+                                   this.user.user_metadata?.name ||
+                                   this.user.email?.split('@')[0] || 'User';
+                const avatarUrl = this.user.user_metadata?.avatar_url ||
+                                 this.user.user_metadata?.picture || null;
+
+                await DB.createProfile(this.user.id, this.user.email, displayName, avatarUrl);
+                const { data: newData } = await DB.getProfile(this.user.id);
+                if (newData && newData[0]) {
+                    this.profile = newData[0];
+                }
             }
+
+            // Auto-sync data to cloud after login
+            await this.autoSyncToCloud();
         }
     },
 
@@ -1532,16 +1557,21 @@ const App = {
         const stats = Storage.getStats();
 
         if (this.isLoggedIn && this.user) {
-            document.getElementById('profile-name').textContent =
-                this.profile?.display_name || this.user.email?.split('@')[0] || 'User';
+            // Use profile display_name, then Google full_name, then email prefix
+            const displayName = this.profile?.display_name ||
+                               this.user.user_metadata?.full_name ||
+                               this.user.user_metadata?.name ||
+                               this.user.email?.split('@')[0] || 'User';
+            document.getElementById('profile-name').textContent = displayName;
             document.getElementById('profile-email').textContent = this.user.email || '';
 
             const avatarEl = document.getElementById('profile-avatar');
-            if (this.user.user_metadata?.avatar_url) {
-                avatarEl.innerHTML = `<img src="${this.user.user_metadata.avatar_url}" alt="Avatar">`;
+            const avatarUrl = this.user.user_metadata?.avatar_url || this.user.user_metadata?.picture;
+            if (avatarUrl) {
+                avatarEl.innerHTML = `<img src="${avatarUrl}" alt="Avatar">`;
             } else {
                 avatarEl.innerHTML = '<span class="avatar-placeholder">' +
-                    (this.profile?.display_name?.[0] || this.user.email?.[0] || '?').toUpperCase() + '</span>';
+                    (displayName[0] || '?').toUpperCase() + '</span>';
             }
         } else {
             document.getElementById('profile-name').textContent = 'Guest';
@@ -1676,10 +1706,46 @@ const App = {
         this.renderProfile();
     },
 
-    // Sync local data to cloud
-    async syncToCloud() {
+    // Open edit profile modal
+    openEditProfile() {
+        const currentName = this.profile?.display_name ||
+                           this.user?.user_metadata?.full_name ||
+                           this.user?.email?.split('@')[0] || '';
+        document.getElementById('edit-display-name').value = currentName;
+        document.getElementById('modal-edit-profile').classList.remove('hidden');
+        document.getElementById('edit-display-name').focus();
+    },
+
+    // Save profile changes
+    async saveProfile() {
+        const newName = document.getElementById('edit-display-name').value.trim();
+
+        if (!newName) {
+            alert('Please enter a display name');
+            return;
+        }
+
+        try {
+            await DB.updateProfile(this.user.id, { display_name: newName });
+
+            // Update local profile
+            if (this.profile) {
+                this.profile.display_name = newName;
+            } else {
+                this.profile = { display_name: newName };
+            }
+
+            document.getElementById('modal-edit-profile').classList.add('hidden');
+            this.renderProfile();
+        } catch (e) {
+            console.error('Error saving profile:', e);
+            alert('Failed to save profile: ' + e.message);
+        }
+    },
+
+    // Auto-sync local data to cloud (called after login, no alerts)
+    async autoSyncToCloud() {
         if (!this.isLoggedIn || !this.user) {
-            this.showScreen('login');
             return;
         }
 
@@ -1711,10 +1777,9 @@ const App = {
                 );
             }
 
-            alert('Data synced to cloud!');
+            console.log('[Sync] Data synced to cloud');
         } catch (e) {
-            console.error('Sync error:', e);
-            alert('Sync failed: ' + e.message);
+            console.error('[Sync] Auto-sync error:', e);
         }
     },
 

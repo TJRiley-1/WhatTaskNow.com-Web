@@ -13,22 +13,17 @@ const Supabase = {
 
     // Initialize
     async init() {
-        console.log('[Auth] Initializing Supabase auth...');
-
         // Check for OAuth callback FIRST (before restoring old session)
         await this.handleAuthCallback();
 
         // If no session from callback, check for existing session
         if (!this.session) {
-            console.log('[Auth] No session from callback, checking localStorage...');
             const storedSession = localStorage.getItem('supabase_session');
             if (storedSession) {
                 try {
                     this.session = JSON.parse(storedSession);
-                    console.log('[Auth] Found stored session, refreshing...');
                     await this.refreshSession();
                 } catch (e) {
-                    console.error('[Auth] Error restoring session:', e);
                     this.clearSession();
                 }
             }
@@ -36,11 +31,9 @@ const Supabase = {
 
         // Ensure we have user data if we have a session
         if (this.session && !this.user) {
-            console.log('[Auth] Have session but no user, fetching user...');
             await this.getUser();
         }
 
-        console.log('[Auth] Init complete. User:', this.user?.email || 'none');
         return this.user;
     },
 
@@ -128,35 +121,27 @@ const Supabase = {
     // Auth: Handle OAuth callback
     async handleAuthCallback() {
         const hash = window.location.hash;
-        console.log('[Auth] Checking for OAuth callback, hash:', hash);
 
         // Check for error in hash
         if (hash && hash.includes('error')) {
             const params = new URLSearchParams(hash.substring(1));
-            console.error('[Auth] OAuth error:', params.get('error'), params.get('error_description'));
+            console.error('OAuth error:', params.get('error'), params.get('error_description'));
             return;
         }
 
         if (hash && hash.includes('access_token')) {
-            console.log('[Auth] Found access_token in hash, processing...');
             const params = new URLSearchParams(hash.substring(1));
             const access_token = params.get('access_token');
             const refresh_token = params.get('refresh_token');
             const expires_in = params.get('expires_in');
 
             if (access_token) {
-                console.log('[Auth] Setting session with tokens...');
-                try {
-                    await this.setSession({
-                        access_token,
-                        refresh_token,
-                        expires_in: parseInt(expires_in),
-                        expires_at: Date.now() + (parseInt(expires_in) * 1000)
-                    });
-                    console.log('[Auth] Session set successfully, user:', this.user?.email);
-                } catch (e) {
-                    console.error('[Auth] Error setting session:', e);
-                }
+                await this.setSession({
+                    access_token,
+                    refresh_token,
+                    expires_in: parseInt(expires_in),
+                    expires_at: Date.now() + (parseInt(expires_in) * 1000)
+                });
 
                 // Clear the hash
                 window.history.replaceState(null, '', window.location.pathname);
@@ -384,6 +369,21 @@ const DB = {
     async getProfile(userId) {
         const query = new SupabaseQuery(Supabase, 'profiles');
         return query.eq('id', userId).execute();
+    },
+
+    // Create user profile
+    async createProfile(userId, email, displayName, avatarUrl) {
+        const query = new SupabaseQuery(Supabase, 'profiles');
+        return query.upsert({
+            id: userId,
+            email: email,
+            display_name: displayName,
+            avatar_url: avatarUrl,
+            total_points: 0,
+            total_tasks_completed: 0,
+            total_time_spent: 0,
+            current_rank: 'Task Newbie'
+        });
     },
 
     // Update user profile

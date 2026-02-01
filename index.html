@@ -772,8 +772,8 @@
                 </div>
 
                 <div class="profile-actions">
-                    <button id="btn-sync-data" class="btn btn-secondary btn-large hidden">
-                        Sync Data to Cloud
+                    <button id="btn-edit-profile" class="btn btn-secondary btn-large hidden">
+                        Edit Profile
                     </button>
                     <button id="btn-view-groups" class="btn btn-outline btn-large">
                         My Groups
@@ -841,6 +841,21 @@
                 <div class="modal-buttons">
                     <button id="btn-cancel-join-group" class="btn btn-outline">Cancel</button>
                     <button id="btn-confirm-join-group" class="btn btn-primary">Join</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Profile Modal -->
+        <div id="modal-edit-profile" class="modal hidden">
+            <div class="modal-content">
+                <h3>Edit Profile</h3>
+                <div class="form-group">
+                    <label for="edit-display-name">Display Name</label>
+                    <input type="text" id="edit-display-name" placeholder="Your name" maxlength="50">
+                </div>
+                <div class="modal-buttons">
+                    <button id="btn-cancel-edit-profile" class="btn btn-outline">Cancel</button>
+                    <button id="btn-save-profile" class="btn btn-primary">Save</button>
                 </div>
             </div>
         </div>

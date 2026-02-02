@@ -30,12 +30,18 @@ const App = {
     profile: null,
     currentGroup: null,
 
+    // Onboarding state
+    tutorialStep: 0,
+
     // Initialize the app
     async init() {
         this.bindEvents();
         this.renderTaskTypes();
         this.renderEditTaskTypes();
         this.updateRankDisplay();
+
+        // Check if we just came back from OAuth (hash contains access_token)
+        const isOAuthCallback = window.location.hash && window.location.hash.includes('access_token');
 
         // Initialize Supabase and check auth
         try {
@@ -50,7 +56,30 @@ const App = {
         }
 
         this.updateAuthUI();
-        this.showScreen('home');
+
+        // Check if onboarding is complete
+        if (!this.isOnboardingComplete()) {
+            // If user just signed in via OAuth during onboarding, go to tutorial
+            if (isOAuthCallback && this.isLoggedIn) {
+                this.tutorialStep = 0;
+                this.updateTutorialUI();
+                this.showScreen('tutorial');
+            } else {
+                this.showScreen('welcome');
+            }
+        } else {
+            this.showScreen('home');
+        }
+    },
+
+    // Check if onboarding has been completed
+    isOnboardingComplete() {
+        return localStorage.getItem('whatnow_onboarding_complete') === 'true';
+    },
+
+    // Mark onboarding as complete
+    completeOnboarding() {
+        localStorage.setItem('whatnow_onboarding_complete', 'true');
     },
 
     // Screen navigation
@@ -297,6 +326,103 @@ const App = {
 
         // Auth and social events
         this.bindAuthEvents();
+
+        // Onboarding events
+        this.bindOnboardingEvents();
+    },
+
+    // Bind onboarding events
+    bindOnboardingEvents() {
+        // Welcome screen - Google sign in
+        document.getElementById('btn-welcome-google').addEventListener('click', () => {
+            Supabase.signInWithGoogle();
+        });
+
+        // Welcome screen - Continue as guest
+        document.getElementById('btn-welcome-guest').addEventListener('click', () => {
+            this.tutorialStep = 0;
+            this.updateTutorialUI();
+            this.showScreen('tutorial');
+        });
+
+        // Tutorial - Skip button
+        document.getElementById('btn-tutorial-skip').addEventListener('click', () => {
+            this.showInstallPrompt();
+        });
+
+        // Tutorial - Back button
+        document.getElementById('btn-tutorial-back').addEventListener('click', () => {
+            if (this.tutorialStep > 0) {
+                this.tutorialStep--;
+                this.updateTutorialUI();
+            }
+        });
+
+        // Tutorial - Next button
+        document.getElementById('btn-tutorial-next').addEventListener('click', () => {
+            if (this.tutorialStep < 3) {
+                this.tutorialStep++;
+                this.updateTutorialUI();
+            } else {
+                this.showInstallPrompt();
+            }
+        });
+
+        // Install prompt - Done button
+        document.getElementById('btn-install-done').addEventListener('click', () => {
+            this.completeOnboarding();
+            this.showScreen('home');
+        });
+    },
+
+    // Update tutorial UI based on current step
+    updateTutorialUI() {
+        // Update dots
+        document.querySelectorAll('.tutorial-dot').forEach((dot, index) => {
+            dot.classList.toggle('active', index <= this.tutorialStep);
+        });
+
+        // Update cards
+        document.querySelectorAll('.tutorial-card').forEach((card, index) => {
+            card.classList.remove('active', 'exiting');
+            if (index === this.tutorialStep) {
+                card.classList.add('active');
+            } else if (index < this.tutorialStep) {
+                card.classList.add('exiting');
+            }
+        });
+
+        // Update buttons
+        document.getElementById('btn-tutorial-back').disabled = this.tutorialStep === 0;
+        document.getElementById('btn-tutorial-next').textContent = this.tutorialStep === 3 ? 'Get Started' : 'Next';
+    },
+
+    // Show install prompt with platform detection
+    showInstallPrompt() {
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        const isAndroid = /Android/.test(navigator.userAgent);
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+                           window.navigator.standalone === true;
+
+        // Hide all instruction sets first
+        document.getElementById('install-instructions-ios').classList.add('hidden');
+        document.getElementById('install-instructions-android').classList.add('hidden');
+        document.getElementById('install-instructions-desktop').classList.add('hidden');
+
+        // Show platform-specific instructions
+        if (isStandalone) {
+            // Already installed
+            document.getElementById('install-instructions-desktop').classList.remove('hidden');
+        } else if (isIOS) {
+            document.getElementById('install-instructions-ios').classList.remove('hidden');
+        } else if (isAndroid) {
+            document.getElementById('install-instructions-android').classList.remove('hidden');
+        } else {
+            // Desktop or unknown
+            document.getElementById('install-instructions-desktop').classList.remove('hidden');
+        }
+
+        this.showScreen('install-prompt');
     },
 
     // Bind multi-add events
@@ -1428,13 +1554,7 @@ const App = {
             Supabase.signInWithGoogle();
         });
 
-        document.getElementById('btn-facebook-login').addEventListener('click', () => {
-            Supabase.signInWithFacebook();
-        });
-
-        document.getElementById('btn-apple-login').addEventListener('click', () => {
-            Supabase.signInWithApple();
-        });
+        // Facebook button is disabled - no event listener needed
 
         // Login screen - Email
         document.getElementById('btn-email-login').addEventListener('click', () => {

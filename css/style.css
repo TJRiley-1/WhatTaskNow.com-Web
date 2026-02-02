@@ -1515,6 +1515,350 @@ body {
     color: var(--primary);
 }
 
+/* Facebook Coming Soon - disabled state */
+.btn-facebook:disabled {
+    background: #4a5568;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.btn-facebook:disabled:hover {
+    background: #4a5568;
+}
+
+/* Welcome Screen (Onboarding) */
+.welcome-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    text-align: center;
+}
+
+.welcome-logo {
+    margin-bottom: 16px;
+}
+
+.welcome-logo img {
+    width: 80px;
+    height: 80px;
+}
+
+.welcome-features {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 32px;
+    width: 100%;
+    max-width: 280px;
+}
+
+.welcome-feature {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-align: left;
+    font-size: 0.95rem;
+    color: var(--text-muted);
+}
+
+.welcome-feature-icon {
+    width: 32px;
+    height: 32px;
+    background: var(--bg-elevated);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    color: var(--primary);
+    flex-shrink: 0;
+}
+
+.welcome-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    max-width: 300px;
+    margin-bottom: 24px;
+}
+
+.welcome-note {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    max-width: 280px;
+}
+
+/* Tutorial Screen (Onboarding) */
+.tutorial-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 24px 20px;
+    position: relative;
+}
+
+.tutorial-progress {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.tutorial-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: background 0.3s ease;
+}
+
+.tutorial-dot.active {
+    background: var(--primary);
+}
+
+.tutorial-skip {
+    position: absolute;
+    top: 24px;
+    right: 20px;
+}
+
+.tutorial-cards {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.tutorial-card {
+    position: absolute;
+    width: 100%;
+    max-width: 320px;
+    text-align: center;
+    opacity: 0;
+    transform: translateX(100%);
+    transition: all 0.3s ease;
+}
+
+.tutorial-card.active {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.tutorial-card.exiting {
+    opacity: 0;
+    transform: translateX(-100%);
+}
+
+.tutorial-card h2 {
+    font-size: 1.5rem;
+    margin-bottom: 12px;
+}
+
+.tutorial-card p {
+    color: var(--text-muted);
+    line-height: 1.6;
+}
+
+.tutorial-mockup {
+    background: var(--bg-card);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 24px;
+    min-height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mockup-task {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+}
+
+.mockup-tag {
+    background: var(--bg-elevated);
+    padding: 6px 12px;
+    border-radius: 16px;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+.mockup-state {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.mockup-state-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--text-muted);
+}
+
+.mockup-selected {
+    background: var(--primary);
+    color: white;
+    padding: 6px 16px;
+    border-radius: 8px;
+    font-weight: 500;
+}
+
+.mockup-swipe {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.mockup-swipe-left {
+    color: var(--danger);
+    font-size: 0.875rem;
+}
+
+.mockup-swipe-right {
+    color: var(--success);
+    font-size: 0.875rem;
+}
+
+.mockup-card-mini {
+    background: var(--bg-elevated);
+    padding: 20px 32px;
+    border-radius: var(--radius-sm);
+    font-weight: 500;
+}
+
+.mockup-points {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.mockup-points-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--secondary), #fbbf24);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.mockup-points-label {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+}
+
+.tutorial-nav {
+    display: flex;
+    gap: 12px;
+    padding-top: 16px;
+}
+
+.tutorial-nav .btn {
+    flex: 1;
+    padding: 16px;
+}
+
+/* Install Prompt Screen (Onboarding) */
+.install-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    text-align: center;
+}
+
+.install-icon {
+    margin-bottom: 20px;
+}
+
+.install-container h2 {
+    font-size: 1.5rem;
+    margin-bottom: 8px;
+}
+
+.install-subtitle {
+    color: var(--text-muted);
+    margin-bottom: 32px;
+    max-width: 280px;
+}
+
+.install-instructions {
+    width: 100%;
+    max-width: 320px;
+    margin-bottom: 32px;
+}
+
+.install-step {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    text-align: left;
+    padding: 16px;
+    background: var(--bg-card);
+    border-radius: var(--radius-sm);
+    margin-bottom: 12px;
+}
+
+.install-step-num {
+    width: 28px;
+    height: 28px;
+    background: var(--primary);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.875rem;
+    flex-shrink: 0;
+}
+
+.install-step svg {
+    vertical-align: middle;
+    margin-left: 4px;
+}
+
+.install-ready {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 32px;
+    background: var(--bg-card);
+    border-radius: var(--radius);
+}
+
+.install-ready-icon {
+    width: 48px;
+    height: 48px;
+    background: var(--success);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+}
+
+.install-ready p {
+    color: var(--text-muted);
+}
+
+#btn-install-done {
+    width: 100%;
+    max-width: 280px;
+}
+
 /* Utilities */
 .hidden {
     display: none !important;
@@ -1526,7 +1870,13 @@ body {
         padding-top: calc(20px + env(safe-area-inset-top));
     }
 
-    .home-container {
+    .home-container,
+    .welcome-container,
+    .install-container {
         padding-top: calc(40px + env(safe-area-inset-top));
+    }
+
+    .tutorial-container {
+        padding-top: calc(24px + env(safe-area-inset-top));
     }
 }

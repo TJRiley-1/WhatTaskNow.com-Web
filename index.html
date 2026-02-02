@@ -707,17 +707,11 @@
                         </svg>
                         Sign in with Google
                     </button>
-                    <button id="btn-facebook-login" class="btn btn-facebook btn-large">
+                    <button id="btn-facebook-login" class="btn btn-facebook btn-large" disabled>
                         <svg class="facebook-icon" viewBox="0 0 24 24" width="24" height="24">
                             <path fill="#ffffff" d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
                         </svg>
-                        Sign in with Facebook
-                    </button>
-                    <button id="btn-apple-login" class="btn btn-apple btn-large">
-                        <svg class="apple-icon" viewBox="0 0 24 24" width="24" height="24">
-                            <path fill="#ffffff" d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
-                        </svg>
-                        Sign in with Apple
+                        Coming Soon
                     </button>
                 </div>
 
@@ -869,6 +863,184 @@
                     <button id="btn-cancel-edit-profile" class="btn btn-outline">Cancel</button>
                     <button id="btn-save-profile" class="btn btn-primary">Save</button>
                 </div>
+            </div>
+        </div>
+
+        <!-- Welcome Screen (Onboarding) -->
+        <div id="screen-welcome" class="screen">
+            <div class="welcome-container">
+                <div class="welcome-logo">
+                    <img src="icons/icon.svg" alt="What Now?" width="80" height="80">
+                </div>
+                <h1 class="app-title">What Now?</h1>
+                <p class="app-subtitle">Stop overthinking. Start doing.</p>
+
+                <div class="welcome-features">
+                    <div class="welcome-feature">
+                        <span class="welcome-feature-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        </span>
+                        <span>Add your tasks with tags</span>
+                    </div>
+                    <div class="welcome-feature">
+                        <span class="welcome-feature-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        </span>
+                        <span>Get smart suggestions</span>
+                    </div>
+                    <div class="welcome-feature">
+                        <span class="welcome-feature-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                        </span>
+                        <span>Earn points & level up</span>
+                    </div>
+                </div>
+
+                <div class="welcome-buttons">
+                    <button id="btn-welcome-google" class="btn btn-google btn-large">
+                        <svg class="google-icon" viewBox="0 0 24 24" width="24" height="24">
+                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                        </svg>
+                        Sign in with Google
+                    </button>
+                    <button id="btn-welcome-facebook" class="btn btn-facebook btn-large" disabled>
+                        <svg class="facebook-icon" viewBox="0 0 24 24" width="24" height="24">
+                            <path fill="#ffffff" d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                        </svg>
+                        Coming Soon
+                    </button>
+                    <button id="btn-welcome-guest" class="btn btn-secondary btn-large">
+                        Continue as Guest
+                    </button>
+                </div>
+
+                <p class="welcome-note">Your tasks stay on this device. Sign in later to sync.</p>
+            </div>
+        </div>
+
+        <!-- Tutorial Screen (Onboarding) -->
+        <div id="screen-tutorial" class="screen">
+            <div class="tutorial-container">
+                <div class="tutorial-progress">
+                    <span class="tutorial-dot active" data-step="0"></span>
+                    <span class="tutorial-dot" data-step="1"></span>
+                    <span class="tutorial-dot" data-step="2"></span>
+                    <span class="tutorial-dot" data-step="3"></span>
+                </div>
+
+                <button id="btn-tutorial-skip" class="btn btn-text tutorial-skip">Skip</button>
+
+                <div class="tutorial-cards">
+                    <div class="tutorial-card active" data-step="0">
+                        <div class="tutorial-mockup">
+                            <div class="mockup-task">
+                                <span class="mockup-tag">Work</span>
+                                <span class="mockup-tag">15 min</span>
+                                <span class="mockup-tag">Low energy</span>
+                            </div>
+                        </div>
+                        <h2>Add Your Tasks</h2>
+                        <p>Tag each task with time, energy, and social battery needed. This helps match tasks to your current mood.</p>
+                    </div>
+
+                    <div class="tutorial-card" data-step="1">
+                        <div class="tutorial-mockup">
+                            <div class="mockup-state">
+                                <div class="mockup-state-row">
+                                    <span>Energy:</span>
+                                    <span class="mockup-selected">Low</span>
+                                </div>
+                                <div class="mockup-state-row">
+                                    <span>Time:</span>
+                                    <span class="mockup-selected">15 min</span>
+                                </div>
+                            </div>
+                        </div>
+                        <h2>Get Smart Suggestions</h2>
+                        <p>Tell us how you're feeling and how much time you have. We'll find tasks that match your current state.</p>
+                    </div>
+
+                    <div class="tutorial-card" data-step="2">
+                        <div class="tutorial-mockup">
+                            <div class="mockup-swipe">
+                                <span class="mockup-swipe-left">Skip</span>
+                                <div class="mockup-card-mini">Task</div>
+                                <span class="mockup-swipe-right">Do it!</span>
+                            </div>
+                        </div>
+                        <h2>Swipe to Decide</h2>
+                        <p>Swipe right to commit to a task, swipe left to skip. No more decision paralysis!</p>
+                    </div>
+
+                    <div class="tutorial-card" data-step="3">
+                        <div class="tutorial-mockup">
+                            <div class="mockup-points">
+                                <span class="mockup-points-value">+25</span>
+                                <span class="mockup-points-label">points</span>
+                            </div>
+                        </div>
+                        <h2>Earn Points & Level Up</h2>
+                        <p>Complete tasks to earn points and climb the ranks. Compete with friends on leaderboards!</p>
+                    </div>
+                </div>
+
+                <div class="tutorial-nav">
+                    <button id="btn-tutorial-back" class="btn btn-outline" disabled>Back</button>
+                    <button id="btn-tutorial-next" class="btn btn-primary">Next</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Install Prompt Screen (Onboarding) -->
+        <div id="screen-install-prompt" class="screen">
+            <div class="install-container">
+                <div class="install-icon">
+                    <img src="icons/icon.svg" alt="What Now?" width="64" height="64">
+                </div>
+                <h2>Add to Home Screen</h2>
+                <p class="install-subtitle">For the best experience, install What Now? on your device.</p>
+
+                <div id="install-instructions-ios" class="install-instructions hidden">
+                    <div class="install-step">
+                        <span class="install-step-num">1</span>
+                        <span>Tap the <strong>Share</strong> button <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></span>
+                    </div>
+                    <div class="install-step">
+                        <span class="install-step-num">2</span>
+                        <span>Scroll and tap <strong>"Add to Home Screen"</strong></span>
+                    </div>
+                    <div class="install-step">
+                        <span class="install-step-num">3</span>
+                        <span>Tap <strong>"Add"</strong> to confirm</span>
+                    </div>
+                </div>
+
+                <div id="install-instructions-android" class="install-instructions hidden">
+                    <div class="install-step">
+                        <span class="install-step-num">1</span>
+                        <span>Tap the <strong>menu</strong> button <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></span>
+                    </div>
+                    <div class="install-step">
+                        <span class="install-step-num">2</span>
+                        <span>Tap <strong>"Install app"</strong> or <strong>"Add to Home Screen"</strong></span>
+                    </div>
+                    <div class="install-step">
+                        <span class="install-step-num">3</span>
+                        <span>Tap <strong>"Install"</strong> to confirm</span>
+                    </div>
+                </div>
+
+                <div id="install-instructions-desktop" class="install-instructions hidden">
+                    <div class="install-ready">
+                        <span class="install-ready-icon">&#10003;</span>
+                        <p>You're all set! Enjoy using What Now?</p>
+                    </div>
+                </div>
+
+                <button id="btn-install-done" class="btn btn-primary btn-large">Got it!</button>
             </div>
         </div>
 

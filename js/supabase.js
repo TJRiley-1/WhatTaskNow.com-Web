@@ -116,11 +116,6 @@ const Supabase = {
         this.signInWithOAuth('facebook');
     },
 
-    // Auth: Sign in with OAuth (Apple)
-    async signInWithApple() {
-        this.signInWithOAuth('apple');
-    },
-
     // Auth: Generic OAuth sign-in
     signInWithOAuth(provider) {
         let redirectTo = window.location.origin;

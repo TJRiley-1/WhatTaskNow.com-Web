@@ -32,6 +32,7 @@ const App = {
 
     // Onboarding state
     tutorialStep: 0,
+    tutorialReviewMode: false,
 
     // Initialize the app
     async init() {
@@ -61,6 +62,7 @@ const App = {
         if (!this.isOnboardingComplete()) {
             // If user just signed in via OAuth during onboarding, go to tutorial
             if (isOAuthCallback && this.isLoggedIn) {
+                this.tutorialReviewMode = false;
                 this.tutorialStep = 0;
                 this.updateTutorialUI();
                 this.showScreen('tutorial');
@@ -340,6 +342,7 @@ const App = {
 
         // Welcome screen - Continue as guest
         document.getElementById('btn-welcome-guest').addEventListener('click', () => {
+            this.tutorialReviewMode = false;
             this.tutorialStep = 0;
             this.updateTutorialUI();
             this.showScreen('tutorial');
@@ -347,7 +350,7 @@ const App = {
 
         // Tutorial - Skip button
         document.getElementById('btn-tutorial-skip').addEventListener('click', () => {
-            this.showInstallPrompt();
+            this.finishTutorial();
         });
 
         // Tutorial - Back button
@@ -364,7 +367,7 @@ const App = {
                 this.tutorialStep++;
                 this.updateTutorialUI();
             } else {
-                this.showInstallPrompt();
+                this.finishTutorial();
             }
         });
 
@@ -394,7 +397,31 @@ const App = {
 
         // Update buttons
         document.getElementById('btn-tutorial-back').disabled = this.tutorialStep === 0;
-        document.getElementById('btn-tutorial-next').textContent = this.tutorialStep === 3 ? 'Get Started' : 'Next';
+        document.getElementById('btn-tutorial-skip').textContent = this.tutorialReviewMode ? 'Close' : 'Skip';
+
+        if (this.tutorialStep === 3) {
+            document.getElementById('btn-tutorial-next').textContent = this.tutorialReviewMode ? 'Done' : 'Get Started';
+        } else {
+            document.getElementById('btn-tutorial-next').textContent = 'Next';
+        }
+    },
+
+    // Open tutorial from profile (review mode)
+    openTutorialFromProfile() {
+        this.tutorialReviewMode = true;
+        this.tutorialStep = 0;
+        this.updateTutorialUI();
+        this.showScreen('tutorial');
+    },
+
+    // Finish tutorial - different behavior for review vs onboarding
+    finishTutorial() {
+        if (this.tutorialReviewMode) {
+            this.tutorialReviewMode = false;
+            this.showScreen('profile');
+        } else {
+            this.showInstallPrompt();
+        }
     },
 
     // Show install prompt with platform detection
@@ -1593,6 +1620,10 @@ const App = {
 
         document.getElementById('btn-login-from-profile').addEventListener('click', () => {
             this.showScreen('login');
+        });
+
+        document.getElementById('btn-view-tutorial').addEventListener('click', () => {
+            this.openTutorialFromProfile();
         });
 
         // Groups screen

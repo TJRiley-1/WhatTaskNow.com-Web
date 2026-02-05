@@ -1881,6 +1881,59 @@ body {
     max-width: 280px;
 }
 
+/* Floating Notification Bell */
+.floating-bell {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 48px;
+    height: 48px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 60;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+    transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.floating-bell:hover {
+    transform: scale(1.05);
+    background: var(--bg-elevated);
+}
+
+.floating-bell-icon {
+    width: 22px;
+    height: 22px;
+    color: var(--text);
+}
+
+.floating-bell-badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: var(--danger);
+    color: white;
+    font-size: 0.6rem;
+    font-weight: 600;
+    min-width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+}
+
+@supports (padding-top: env(safe-area-inset-top)) {
+    .floating-bell {
+        top: calc(20px + env(safe-area-inset-top));
+    }
+}
+
 /* Bottom Navigation */
 .bottom-nav {
     position: fixed;

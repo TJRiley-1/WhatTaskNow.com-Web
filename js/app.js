@@ -2257,7 +2257,9 @@ const App = {
         bottomNav.querySelectorAll('.nav-item').forEach(item => {
             item.addEventListener('click', () => {
                 const screen = item.dataset.screen;
-                if (screen === 'add-type') {
+                if (screen === 'home') {
+                    this.updateRankDisplay();
+                } else if (screen === 'add-type') {
                     this.newTask = {};
                     this.fromTemplate = false;
                     this.updateTemplateButtonVisibility();
@@ -2269,16 +2271,23 @@ const App = {
                 this.showScreen(screen);
             });
         });
+
+        // Floating notification bell
+        document.getElementById('floating-notification-bell').addEventListener('click', () => {
+            this.showScreen('notifications');
+        });
     },
 
     // Update bottom nav visibility and active state
     updateBottomNav(screenId) {
         const bottomNav = document.getElementById('bottom-nav');
+        const floatingBell = document.getElementById('floating-notification-bell');
         const activeScreen = document.getElementById(`screen-${screenId}`);
 
         // Hide nav on certain screens
         if (this.hideNavScreens.includes(screenId)) {
             bottomNav.classList.add('hidden');
+            floatingBell.classList.add('hidden');
             if (activeScreen) {
                 activeScreen.classList.remove('has-bottom-nav');
             }
@@ -2288,12 +2297,20 @@ const App = {
                 activeScreen.classList.add('has-bottom-nav');
             }
 
+            // Show floating bell only on home screen
+            if (screenId === 'home') {
+                floatingBell.classList.remove('hidden');
+            } else {
+                floatingBell.classList.add('hidden');
+            }
+
             // Update active state
             bottomNav.querySelectorAll('.nav-item').forEach(item => {
                 const navScreen = item.dataset.screen;
                 // Check if current screen matches or is a sub-screen
                 const isAddScreen = screenId.startsWith('add-') || screenId.startsWith('multi-') || screenId === 'import' || screenId === 'import-review' || screenId === 'import-setup' || screenId === 'templates';
                 const isActive = navScreen === screenId ||
+                    (navScreen === 'home' && screenId === 'home') ||
                     (navScreen === 'profile' && ['groups', 'leaderboard'].includes(screenId)) ||
                     (navScreen === 'add-type' && isAddScreen);
                 item.classList.toggle('active', isActive);
@@ -2369,7 +2386,7 @@ const App = {
     // Update notification badge count
     updateNotificationBadge() {
         const notifications = this.getNotifications();
-        const badge = document.getElementById('nav-badge');
+        const badge = document.getElementById('floating-bell-badge');
         const urgentCount = notifications.filter(n => n.priority >= 2).length;
 
         if (urgentCount > 0) {

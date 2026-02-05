@@ -34,12 +34,25 @@ const App = {
     tutorialStep: 0,
     tutorialReviewMode: false,
 
+    // Swipe cleanup function
+    swipeCleanup: null,
+
+    // Pending action (for resuming after login redirect)
+    pendingAction: null,
+
     // Initialize the app
     async init() {
         this.bindEvents();
+        this.bindBottomNavEvents();
+        this.bindNotificationEvents();
         this.renderTaskTypes();
         this.renderEditTaskTypes();
         this.updateRankDisplay();
+
+        // Initialize notification manager
+        if (typeof NotificationManager !== 'undefined') {
+            NotificationManager.init();
+        }
 
         // Check if we just came back from OAuth (hash contains access_token)
         const isOAuthCallback = window.location.hash && window.location.hash.includes('access_token');
@@ -70,7 +83,15 @@ const App = {
                 this.showScreen('welcome');
             }
         } else {
-            this.showScreen('home');
+            // Check for pending action after OAuth callback
+            if (isOAuthCallback && this.isLoggedIn) {
+                const hadPendingAction = await this.checkPendingAction();
+                if (!hadPendingAction) {
+                    this.showScreen('home');
+                }
+            } else {
+                this.showScreen('home');
+            }
         }
     },
 
@@ -84,8 +105,16 @@ const App = {
         localStorage.setItem('whatnow_onboarding_complete', 'true');
     },
 
+    // Screens where bottom nav should be hidden
+    hideNavScreens: ['login', 'welcome', 'tutorial', 'install-prompt', 'swipe', 'accepted', 'timer', 'celebration'],
+
     // Screen navigation
     showScreen(screenId) {
+        // Clean up swipe listeners when leaving swipe screen
+        if (this.currentScreen === 'swipe' && screenId !== 'swipe') {
+            this.cleanupSwipe();
+        }
+
         const screens = document.querySelectorAll('.screen');
         screens.forEach(screen => {
             if (screen.id === `screen-${screenId}`) {
@@ -103,6 +132,21 @@ const App = {
         // Screen-specific setup
         if (screenId === 'manage') {
             this.renderTaskList();
+        } else if (screenId === 'notifications') {
+            this.renderNotifications();
+        } else if (screenId === 'calendar') {
+            this.renderCalendar();
+        }
+
+        // Update bottom nav visibility and active state
+        this.updateBottomNav(screenId);
+    },
+
+    // Clean up swipe event listeners
+    cleanupSwipe() {
+        if (this.swipeCleanup) {
+            this.swipeCleanup();
+            this.swipeCleanup = null;
         }
     },
 
@@ -903,10 +947,10 @@ const App = {
         document.getElementById('btn-find-task').disabled = true;
     },
 
-    // Check if all state options are selected
+    // Check if at least one state option is selected
     updateFindButtonState() {
-        const allSelected = this.currentState.energy && this.currentState.social && this.currentState.time;
-        document.getElementById('btn-find-task').disabled = !allSelected;
+        const anySelected = this.currentState.energy || this.currentState.social || this.currentState.time;
+        document.getElementById('btn-find-task').disabled = !anySelected;
     },
 
     // Render task types
@@ -1003,7 +1047,7 @@ const App = {
     saveNewTask() {
         const saveAsTemplate = document.getElementById('save-as-template').checked;
 
-        Storage.addTask(this.newTask);
+        const savedTask = Storage.addTask(this.newTask);
 
         // Save as template if checked
         if (saveAsTemplate) {
@@ -1015,6 +1059,16 @@ const App = {
                 social: this.newTask.social,
                 energy: this.newTask.energy
             });
+        }
+
+        // Schedule notifications if task has due date
+        if (savedTask.dueDate) {
+            this.scheduleTaskNotifications(savedTask);
+
+            // Prompt for notification permission if first task with due date
+            if (this.shouldPromptForNotifications()) {
+                this.showNotificationPrompt();
+            }
         }
 
         // Clear form
@@ -1122,6 +1176,9 @@ const App = {
 
     // Render swipe cards
     renderCards() {
+        // Clean up any existing swipe listeners before rendering new cards
+        this.cleanupSwipe();
+
         const stack = document.getElementById('card-stack');
         const noTasks = document.getElementById('no-tasks-message');
 
@@ -1236,6 +1293,14 @@ const App = {
         card.addEventListener('touchstart', onStart, { passive: true });
         card.addEventListener('touchmove', onMove, { passive: true });
         card.addEventListener('touchend', onEnd);
+
+        // Store cleanup function to remove document-level listeners
+        this.swipeCleanup = () => {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onEnd);
+            card.removeEventListener('touchmove', onMove);
+            card.removeEventListener('touchend', onEnd);
+        };
     },
 
     // Animate card off screen
@@ -1743,7 +1808,53 @@ const App = {
         document.getElementById('profile-tasks').textContent = stats.completed;
         document.getElementById('profile-rank').textContent = Storage.getRank(stats.totalPoints).name.replace('Task ', '');
 
+        // Show/hide notifications button
+        const notifBtn = document.getElementById('btn-enable-notifications-profile');
+        if (typeof NotificationManager !== 'undefined' &&
+            NotificationManager.isSupported() &&
+            NotificationManager.getPermission() !== 'granted') {
+            notifBtn.classList.remove('hidden');
+        } else {
+            notifBtn.classList.add('hidden');
+        }
+
         this.updateAuthUI();
+    },
+
+    // Check and execute pending action after login
+    async checkPendingAction() {
+        // Try to restore from sessionStorage first
+        if (!this.pendingAction) {
+            const stored = sessionStorage.getItem('whatnow_pending_action');
+            if (stored) {
+                this.pendingAction = JSON.parse(stored);
+            }
+        }
+
+        if (!this.pendingAction || !this.isLoggedIn) return;
+
+        const action = this.pendingAction;
+        this.pendingAction = null;
+        sessionStorage.removeItem('whatnow_pending_action');
+
+        try {
+            if (action.type === 'createGroup') {
+                const { data, error } = await DB.createGroup(this.user.id, action.data.name, action.data.desc);
+                if (error) throw error;
+                await this.renderGroups();
+                this.showScreen('groups');
+                return true;
+            } else if (action.type === 'joinGroup') {
+                const { data, error } = await DB.joinGroup(this.user.id, action.data.code);
+                if (error) throw error;
+                await this.renderGroups();
+                this.showScreen('groups');
+                return true;
+            }
+        } catch (e) {
+            alert('Failed to complete action: ' + e.message);
+        }
+        return false;
     },
 
     // Email login
@@ -1770,7 +1881,12 @@ const App = {
             this.isLoggedIn = true;
             await this.loadProfile();
             this.updateAuthUI();
-            this.showScreen('home');
+
+            // Check for pending action before navigating
+            const hadPendingAction = await this.checkPendingAction();
+            if (!hadPendingAction) {
+                this.showScreen('home');
+            }
         } catch (e) {
             errorEl.textContent = e.message || 'Login failed';
             errorEl.style.color = '';
@@ -1848,7 +1964,12 @@ const App = {
             this.isLoggedIn = true;
             await this.loadProfile();
             this.updateAuthUI();
-            this.showScreen('home');
+
+            // Check for pending action before navigating
+            const hadPendingAction = await this.checkPendingAction();
+            if (!hadPendingAction) {
+                this.showScreen('home');
+            }
         } catch (e) {
             errorEl.textContent = e.message || 'Signup failed';
             errorEl.style.color = '';
@@ -1993,6 +2114,10 @@ const App = {
         if (!name) return;
 
         if (!this.isLoggedIn) {
+            // Save pending action to resume after login
+            this.pendingAction = { type: 'createGroup', data: { name, desc } };
+            sessionStorage.setItem('whatnow_pending_action', JSON.stringify(this.pendingAction));
+
             document.getElementById('modal-create-group').classList.add('hidden');
             this.showScreen('login');
             return;
@@ -2006,7 +2131,8 @@ const App = {
             document.getElementById('group-desc').value = '';
             document.getElementById('modal-create-group').classList.add('hidden');
 
-            this.renderGroups();
+            await this.renderGroups();
+            this.showScreen('groups');
         } catch (e) {
             alert('Failed to create group: ' + e.message);
         }
@@ -2022,6 +2148,10 @@ const App = {
         }
 
         if (!this.isLoggedIn) {
+            // Save pending action to resume after login
+            this.pendingAction = { type: 'joinGroup', data: { code } };
+            sessionStorage.setItem('whatnow_pending_action', JSON.stringify(this.pendingAction));
+
             document.getElementById('modal-join-group').classList.add('hidden');
             this.showScreen('login');
             return;
@@ -2034,7 +2164,8 @@ const App = {
             document.getElementById('join-code').value = '';
             document.getElementById('modal-join-group').classList.add('hidden');
 
-            this.renderGroups();
+            await this.renderGroups();
+            this.showScreen('groups');
         } catch (e) {
             alert('Failed to join group: ' + e.message);
         }
@@ -2115,6 +2246,331 @@ const App = {
             this.showScreen('groups');
         } catch (e) {
             alert('Failed to leave group: ' + e.message);
+        }
+    },
+
+    // ==================== BOTTOM NAVIGATION ====================
+
+    // Bind bottom nav events
+    bindBottomNavEvents() {
+        const bottomNav = document.getElementById('bottom-nav');
+        bottomNav.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const screen = item.dataset.screen;
+                if (screen === 'add-type') {
+                    this.newTask = {};
+                    this.fromTemplate = false;
+                    this.updateTemplateButtonVisibility();
+                } else if (screen === 'gallery') {
+                    this.renderGallery();
+                } else if (screen === 'profile') {
+                    this.renderProfile();
+                }
+                this.showScreen(screen);
+            });
+        });
+    },
+
+    // Update bottom nav visibility and active state
+    updateBottomNav(screenId) {
+        const bottomNav = document.getElementById('bottom-nav');
+        const activeScreen = document.getElementById(`screen-${screenId}`);
+
+        // Hide nav on certain screens
+        if (this.hideNavScreens.includes(screenId)) {
+            bottomNav.classList.add('hidden');
+            if (activeScreen) {
+                activeScreen.classList.remove('has-bottom-nav');
+            }
+        } else {
+            bottomNav.classList.remove('hidden');
+            if (activeScreen) {
+                activeScreen.classList.add('has-bottom-nav');
+            }
+
+            // Update active state
+            bottomNav.querySelectorAll('.nav-item').forEach(item => {
+                const navScreen = item.dataset.screen;
+                // Check if current screen matches or is a sub-screen
+                const isAddScreen = screenId.startsWith('add-') || screenId.startsWith('multi-') || screenId === 'import' || screenId === 'import-review' || screenId === 'import-setup' || screenId === 'templates';
+                const isActive = navScreen === screenId ||
+                    (navScreen === 'profile' && ['groups', 'leaderboard'].includes(screenId)) ||
+                    (navScreen === 'add-type' && isAddScreen);
+                item.classList.toggle('active', isActive);
+            });
+
+            // Update notification badge
+            this.updateNotificationBadge();
+        }
+    },
+
+    // Get notifications (due soon, overdue, leaderboard changes)
+    getNotifications() {
+        const notifications = [];
+        const tasks = Storage.getTasks();
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+
+        tasks.forEach(task => {
+            if (!task.dueDate) return;
+
+            const daysUntil = Storage.getDaysUntilDue(task);
+            if (daysUntil === null) return;
+
+            if (daysUntil < 0) {
+                notifications.push({
+                    type: 'overdue',
+                    icon: '⚠️',
+                    title: 'Overdue Task',
+                    desc: task.name,
+                    time: `${Math.abs(daysUntil)} day${Math.abs(daysUntil) !== 1 ? 's' : ''} overdue`,
+                    priority: 3,
+                    taskId: task.id
+                });
+            } else if (daysUntil === 0) {
+                notifications.push({
+                    type: 'due-soon',
+                    icon: '📅',
+                    title: 'Due Today',
+                    desc: task.name,
+                    time: 'Due today',
+                    priority: 2,
+                    taskId: task.id
+                });
+            } else if (daysUntil === 1) {
+                notifications.push({
+                    type: 'due-soon',
+                    icon: '📅',
+                    title: 'Due Tomorrow',
+                    desc: task.name,
+                    time: 'Due tomorrow',
+                    priority: 1,
+                    taskId: task.id
+                });
+            } else if (daysUntil <= 3) {
+                notifications.push({
+                    type: 'due-soon',
+                    icon: '📅',
+                    title: 'Coming Up',
+                    desc: task.name,
+                    time: `Due in ${daysUntil} days`,
+                    priority: 0,
+                    taskId: task.id
+                });
+            }
+        });
+
+        // Sort by priority (higher = more urgent)
+        notifications.sort((a, b) => b.priority - a.priority);
+
+        return notifications;
+    },
+
+    // Update notification badge count
+    updateNotificationBadge() {
+        const notifications = this.getNotifications();
+        const badge = document.getElementById('nav-badge');
+        const urgentCount = notifications.filter(n => n.priority >= 2).length;
+
+        if (urgentCount > 0) {
+            badge.textContent = urgentCount > 9 ? '9+' : urgentCount;
+            badge.classList.remove('hidden');
+        } else {
+            badge.classList.add('hidden');
+        }
+    },
+
+    // Render notifications screen
+    renderNotifications() {
+        const notifications = this.getNotifications();
+        const container = document.getElementById('notifications-list');
+        const noNotifications = document.getElementById('no-notifications');
+
+        if (notifications.length === 0) {
+            container.classList.add('hidden');
+            noNotifications.classList.remove('hidden');
+            return;
+        }
+
+        container.classList.remove('hidden');
+        noNotifications.classList.add('hidden');
+
+        container.innerHTML = notifications.map(n => `
+            <div class="notification-item" data-task-id="${n.taskId || ''}">
+                <div class="notification-icon ${n.type}">
+                    ${n.icon}
+                </div>
+                <div class="notification-content">
+                    <div class="notification-title">${this.escapeHtml(n.title)}</div>
+                    <div class="notification-desc">${this.escapeHtml(n.desc)}</div>
+                    <div class="notification-time">${n.time}</div>
+                </div>
+            </div>
+        `).join('');
+
+        // Click to go to edit task
+        container.querySelectorAll('.notification-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const taskId = item.dataset.taskId;
+                if (taskId) {
+                    this.openEditTask(taskId);
+                }
+            });
+        });
+    },
+
+    // ==================== NOTIFICATION HANDLING ====================
+
+    // Bind notification events
+    bindNotificationEvents() {
+        // Permission modal buttons
+        document.getElementById('btn-enable-notifications').addEventListener('click', async () => {
+            await this.enableNotifications();
+            document.getElementById('modal-notification-permission').classList.add('hidden');
+        });
+
+        document.getElementById('btn-skip-notifications').addEventListener('click', () => {
+            document.getElementById('modal-notification-permission').classList.add('hidden');
+            // Remember that user declined
+            localStorage.setItem('whatnow_notification_prompt_shown', 'true');
+        });
+
+        // Profile enable notifications button
+        document.getElementById('btn-enable-notifications-profile').addEventListener('click', async () => {
+            await this.enableNotifications();
+            this.renderProfile();
+        });
+    },
+
+    // Check if we should prompt for notifications
+    shouldPromptForNotifications() {
+        if (typeof NotificationManager === 'undefined') return false;
+        if (!NotificationManager.isSupported()) return false;
+        if (NotificationManager.getPermission() === 'granted') return false;
+        if (NotificationManager.getPermission() === 'denied') return false;
+        if (localStorage.getItem('whatnow_notification_prompt_shown') === 'true') return false;
+        return true;
+    },
+
+    // Show notification permission prompt
+    showNotificationPrompt() {
+        if (!this.shouldPromptForNotifications()) return;
+        document.getElementById('modal-notification-permission').classList.remove('hidden');
+    },
+
+    // Enable notifications
+    async enableNotifications() {
+        if (typeof NotificationManager === 'undefined') return false;
+
+        const permission = await NotificationManager.requestPermission();
+        if (permission === 'granted') {
+            // Schedule reminders for existing tasks with due dates
+            const tasks = Storage.getTasks();
+            tasks.forEach(task => {
+                if (task.dueDate) {
+                    NotificationManager.scheduleDueDateReminders(task);
+                }
+            });
+            return true;
+        }
+        return false;
+    },
+
+    // Schedule notifications for a newly saved task
+    scheduleTaskNotifications(task) {
+        if (typeof NotificationManager === 'undefined') return;
+        if (NotificationManager.getPermission() !== 'granted') return;
+        if (!task.dueDate) return;
+
+        NotificationManager.scheduleDueDateReminders(task);
+    },
+
+    // Render calendar screen
+    renderCalendar() {
+        const tasks = Storage.getTasks();
+        const completed = Storage.getCompletedTasks();
+
+        // Upcoming tasks with due dates
+        const upcoming = tasks
+            .filter(t => t.dueDate)
+            .map(t => ({
+                ...t,
+                daysUntil: Storage.getDaysUntilDue(t),
+                isOverdue: Storage.isOverdue(t)
+            }))
+            .sort((a, b) => {
+                if (a.isOverdue && !b.isOverdue) return -1;
+                if (!a.isOverdue && b.isOverdue) return 1;
+                return (a.daysUntil || 0) - (b.daysUntil || 0);
+            });
+
+        const upcomingContainer = document.getElementById('calendar-upcoming');
+        const noUpcoming = document.getElementById('no-upcoming');
+
+        if (upcoming.length === 0) {
+            upcomingContainer.classList.add('hidden');
+            noUpcoming.classList.remove('hidden');
+        } else {
+            upcomingContainer.classList.remove('hidden');
+            noUpcoming.classList.add('hidden');
+
+            upcomingContainer.innerHTML = upcoming.slice(0, 10).map(task => {
+                const date = new Date(task.dueDate);
+                const day = date.getDate();
+                const month = date.toLocaleString('default', { month: 'short' });
+
+                return `
+                    <div class="calendar-item${task.isOverdue ? ' overdue' : ''}" data-id="${task.id}">
+                        <div class="calendar-item-date">
+                            <div class="date-day">${day}</div>
+                            <div class="date-month">${month}</div>
+                        </div>
+                        <div class="calendar-item-content">
+                            <div class="calendar-item-name">${this.escapeHtml(task.name)}</div>
+                            <div class="calendar-item-meta">${task.type} · ${task.time} min</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // Click to edit
+            upcomingContainer.querySelectorAll('.calendar-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    this.openEditTask(item.dataset.id);
+                });
+            });
+        }
+
+        // Recently completed
+        const recentCompleted = completed.slice(-10).reverse();
+        const completedContainer = document.getElementById('calendar-completed');
+        const noCompleted = document.getElementById('no-recent-completed');
+
+        if (recentCompleted.length === 0) {
+            completedContainer.classList.add('hidden');
+            noCompleted.classList.remove('hidden');
+        } else {
+            completedContainer.classList.remove('hidden');
+            noCompleted.classList.add('hidden');
+
+            completedContainer.innerHTML = recentCompleted.map(task => {
+                const date = new Date(task.completedAt);
+                const day = date.getDate();
+                const month = date.toLocaleString('default', { month: 'short' });
+
+                return `
+                    <div class="calendar-item completed">
+                        <div class="calendar-item-date">
+                            <div class="date-day">${day}</div>
+                            <div class="date-month">${month}</div>
+                        </div>
+                        <div class="calendar-item-content">
+                            <div class="calendar-item-name">${this.escapeHtml(task.name)}</div>
+                            <div class="calendar-item-meta">${task.type} · +${task.points} pts</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
         }
     }
 };

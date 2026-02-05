@@ -53,7 +53,7 @@
                         Manage Tasks
                     </button>
                     <button id="btn-gallery" class="btn btn-text">
-                        Gallery
+                        Completed Tasks
                     </button>
                     <button id="btn-profile" class="btn btn-text">
                         Profile
@@ -278,7 +278,7 @@
                         <input type="file" id="import-file" accept=".txt,.csv,.html" hidden>
                     </label>
                     <button id="btn-parse-import" class="btn btn-primary">
-                        Parse Tasks
+                        Extract Tasks
                     </button>
                 </div>
             </div>
@@ -489,6 +489,7 @@
                 <h2>How are you feeling?</h2>
             </div>
             <div class="screen-content">
+                <p class="state-hint">The more you choose, the more accurate your recommendations. If you're not sure how you feel, just select one option.</p>
                 <div class="state-section">
                     <h3>Energy level right now</h3>
                     <div class="option-row">
@@ -787,6 +788,9 @@
                     <button id="btn-view-tutorial" class="btn btn-outline btn-large">
                         User Guide
                     </button>
+                    <button id="btn-enable-notifications-profile" class="btn btn-outline btn-large hidden">
+                        Enable Notifications
+                    </button>
                     <button id="btn-logout" class="btn btn-outline btn-danger-text hidden">
                         Sign Out
                     </button>
@@ -865,6 +869,19 @@
                 <div class="modal-buttons">
                     <button id="btn-cancel-edit-profile" class="btn btn-outline">Cancel</button>
                     <button id="btn-save-profile" class="btn btn-primary">Save</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notification Permission Modal -->
+        <div id="modal-notification-permission" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-icon">🔔</div>
+                <h3>Stay on Track</h3>
+                <p class="modal-desc">Get reminders for upcoming tasks and due dates so you never miss a deadline.</p>
+                <div class="modal-buttons">
+                    <button id="btn-skip-notifications" class="btn btn-outline">Not Now</button>
+                    <button id="btn-enable-notifications" class="btn btn-primary">Enable</button>
                 </div>
             </div>
         </div>
@@ -1074,6 +1091,87 @@
                 </div>
             </div>
         </div>
+
+        <!-- Notifications Screen -->
+        <div id="screen-notifications" class="screen">
+            <div class="screen-header">
+                <button class="btn-back" data-back="home">←</button>
+                <h2>Notifications</h2>
+            </div>
+            <div class="screen-content">
+                <div id="notifications-list" class="notifications-list">
+                    <!-- Populated by JS -->
+                </div>
+                <div id="no-notifications" class="no-tasks hidden">
+                    <p>No notifications</p>
+                    <p class="notifications-hint">Tasks due soon and leaderboard updates will appear here.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Calendar Screen -->
+        <div id="screen-calendar" class="screen">
+            <div class="screen-header">
+                <button class="btn-back" data-back="home">←</button>
+                <h2>Calendar</h2>
+            </div>
+            <div class="screen-content">
+                <div class="calendar-section">
+                    <h3 class="calendar-section-title">Upcoming Tasks</h3>
+                    <div id="calendar-upcoming" class="calendar-list">
+                        <!-- Populated by JS -->
+                    </div>
+                    <div id="no-upcoming" class="no-tasks-small hidden">
+                        <p>No upcoming tasks with due dates</p>
+                    </div>
+                </div>
+                <div class="calendar-section">
+                    <h3 class="calendar-section-title">Recently Completed</h3>
+                    <div id="calendar-completed" class="calendar-list">
+                        <!-- Populated by JS -->
+                    </div>
+                    <div id="no-recent-completed" class="no-tasks-small hidden">
+                        <p>No recently completed tasks</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Navigation -->
+        <nav id="bottom-nav" class="bottom-nav hidden">
+            <button class="nav-item" data-screen="notifications">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                </svg>
+                <span class="nav-badge hidden" id="nav-badge">0</span>
+            </button>
+            <button class="nav-item" data-screen="calendar">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                    <line x1="16" y1="2" x2="16" y2="6"/>
+                    <line x1="8" y1="2" x2="8" y2="6"/>
+                    <line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+            </button>
+            <button class="nav-item nav-item-primary" data-screen="add-type">
+                <svg class="nav-icon nav-icon-large" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <line x1="12" y1="5" x2="12" y2="19"/>
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+            </button>
+            <button class="nav-item" data-screen="gallery">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="20 6 9 17 4 12"/>
+                </svg>
+            </button>
+            <button class="nav-item" data-screen="profile">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                </svg>
+            </button>
+        </nav>
     </div>
 
     <script src="js/storage.js"></script>

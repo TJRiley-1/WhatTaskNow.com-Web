@@ -1,5 +1,5 @@
 // Service Worker for What Now? PWA
-const CACHE_NAME = 'whatnow-com-v9';
+const CACHE_NAME = 'whatnow-com-v10';
 const ASSETS = [
     '/',
     '/index.html',
@@ -58,6 +58,28 @@ self.addEventListener('fetch', (event) => {
             .catch(() => {
                 if (event.request.mode === 'navigate') {
                     return caches.match('/index.html');
+                }
+            })
+    );
+});
+
+// Handle notification clicks
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+
+    // Focus or open the app
+    event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true })
+            .then((windowClients) => {
+                // Check if app is already open
+                for (const client of windowClients) {
+                    if (client.url.includes(self.location.origin) && 'focus' in client) {
+                        return client.focus();
+                    }
+                }
+                // Open new window if app not open
+                if (clients.openWindow) {
+                    return clients.openWindow('/');
                 }
             })
     );

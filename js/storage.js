@@ -189,6 +189,7 @@ const Storage = {
     },
 
     // Find matching tasks based on current state
+    // Unselected filters are treated as "match all" (no filtering on that dimension)
     findMatchingTasks(energy, social, time) {
         const tasks = this.getTasks();
         const energyLevels = { low: 1, medium: 2, high: 3 };
@@ -196,10 +197,11 @@ const Storage = {
 
         // Filter tasks that match current state
         // Task requires X energy/social, user has Y - user can do task if Y >= X
+        // If a filter is not selected (null), it matches all tasks on that dimension
         const matching = tasks.filter(task => {
-            const energyMatch = energyLevels[energy] >= energyLevels[task.energy];
-            const socialMatch = socialLevels[social] >= socialLevels[task.social];
-            const timeMatch = time >= task.time;
+            const energyMatch = !energy || energyLevels[energy] >= energyLevels[task.energy];
+            const socialMatch = !social || socialLevels[social] >= socialLevels[task.social];
+            const timeMatch = !time || time >= task.time;
             return energyMatch && socialMatch && timeMatch;
         });
 
@@ -221,14 +223,15 @@ const Storage = {
     },
 
     // Get fallback tasks that match current state
+    // Unselected filters are treated as "match all" (no filtering on that dimension)
     getFallbackTasks(energy, social, time) {
         const energyLevels = { low: 1, medium: 2, high: 3 };
         const socialLevels = { low: 1, medium: 2, high: 3 };
 
         return this.FALLBACK_TASKS.filter(task => {
-            const energyMatch = energyLevels[energy] >= energyLevels[task.energy];
-            const socialMatch = socialLevels[social] >= socialLevels[task.social];
-            const timeMatch = time >= task.time;
+            const energyMatch = !energy || energyLevels[energy] >= energyLevels[task.energy];
+            const socialMatch = !social || socialLevels[social] >= socialLevels[task.social];
+            const timeMatch = !time || time >= task.time;
             return energyMatch && socialMatch && timeMatch;
         }).map(task => ({
             ...task,
@@ -490,3 +493,255 @@ const Storage = {
 
 // Initialize on load
 Storage.init();
+
+// ==================== NOTIFICATION MANAGER ====================
+const NotificationManager = {
+    KEYS: {
+        PERMISSION: 'whatnow_notification_permission',
+        SETTINGS: 'whatnow_notification_settings',
+        SCHEDULED: 'whatnow_scheduled_notifications',
+        LAST_LEADERBOARD: 'whatnow_last_leaderboard'
+    },
+
+    // Default settings
+    DEFAULT_SETTINGS: {
+        dueDateReminders: true,
+        overdueAlerts: true,
+        leaderboardChanges: true,
+        dailyReminder: false,
+        dailyReminderTime: '09:00'
+    },
+
+    // Get notification settings
+    getSettings() {
+        const stored = localStorage.getItem(this.KEYS.SETTINGS);
+        return stored ? { ...this.DEFAULT_SETTINGS, ...JSON.parse(stored) } : this.DEFAULT_SETTINGS;
+    },
+
+    // Save notification settings
+    saveSettings(settings) {
+        localStorage.setItem(this.KEYS.SETTINGS, JSON.stringify(settings));
+    },
+
+    // Check if notifications are supported
+    isSupported() {
+        return 'Notification' in window;
+    },
+
+    // Get current permission state
+    getPermission() {
+        if (!this.isSupported()) return 'unsupported';
+        return Notification.permission;
+    },
+
+    // Request notification permission
+    async requestPermission() {
+        if (!this.isSupported()) return 'unsupported';
+
+        try {
+            const permission = await Notification.requestPermission();
+            localStorage.setItem(this.KEYS.PERMISSION, permission);
+            return permission;
+        } catch (e) {
+            console.error('Permission request failed:', e);
+            return 'denied';
+        }
+    },
+
+    // Show a notification
+    async show(title, options = {}) {
+        if (this.getPermission() !== 'granted') return null;
+
+        const defaults = {
+            icon: '/icons/icon.svg',
+            badge: '/icons/icon.svg',
+            tag: 'whatnow-' + Date.now(),
+            requireInteraction: false
+        };
+
+        try {
+            // Try to use service worker notification first (works when app is closed)
+            const registration = await navigator.serviceWorker?.ready;
+            if (registration) {
+                await registration.showNotification(title, { ...defaults, ...options });
+                return true;
+            } else {
+                // Fallback to regular notification
+                new Notification(title, { ...defaults, ...options });
+                return true;
+            }
+        } catch (e) {
+            console.error('Failed to show notification:', e);
+            return null;
+        }
+    },
+
+    // Schedule a notification for a specific time
+    scheduleNotification(id, time, title, options) {
+        const scheduled = this.getScheduledNotifications();
+        scheduled[id] = { time: time.getTime(), title, options };
+        localStorage.setItem(this.KEYS.SCHEDULED, JSON.stringify(scheduled));
+
+        // Set timeout if notification is within the next 24 hours
+        const delay = time.getTime() - Date.now();
+        if (delay > 0 && delay < 24 * 60 * 60 * 1000) {
+            setTimeout(() => {
+                this.show(title, options);
+                this.removeScheduledNotification(id);
+            }, delay);
+        }
+    },
+
+    // Get scheduled notifications
+    getScheduledNotifications() {
+        const stored = localStorage.getItem(this.KEYS.SCHEDULED);
+        return stored ? JSON.parse(stored) : {};
+    },
+
+    // Remove a scheduled notification
+    removeScheduledNotification(id) {
+        const scheduled = this.getScheduledNotifications();
+        delete scheduled[id];
+        localStorage.setItem(this.KEYS.SCHEDULED, JSON.stringify(scheduled));
+    },
+
+    // Process scheduled notifications on page load
+    processScheduledNotifications() {
+        const scheduled = this.getScheduledNotifications();
+        const now = Date.now();
+
+        Object.entries(scheduled).forEach(([id, data]) => {
+            const delay = data.time - now;
+            if (delay <= 0) {
+                // Past due, show immediately
+                this.show(data.title, data.options);
+                this.removeScheduledNotification(id);
+            } else if (delay < 24 * 60 * 60 * 1000) {
+                // Within 24 hours, schedule
+                setTimeout(() => {
+                    this.show(data.title, data.options);
+                    this.removeScheduledNotification(id);
+                }, delay);
+            }
+        });
+    },
+
+    // Schedule due date reminders for a task
+    scheduleDueDateReminders(task) {
+        if (!task.dueDate || this.getPermission() !== 'granted') return;
+
+        const settings = this.getSettings();
+        if (!settings.dueDateReminders) return;
+
+        const dueDate = new Date(task.dueDate);
+        dueDate.setHours(9, 0, 0, 0); // 9 AM on due date
+
+        const dayBefore = new Date(dueDate);
+        dayBefore.setDate(dayBefore.getDate() - 1);
+
+        const now = new Date();
+
+        // Schedule day before reminder
+        if (dayBefore > now) {
+            this.scheduleNotification(
+                `due-${task.id}-day-before`,
+                dayBefore,
+                'Task Due Tomorrow',
+                {
+                    body: task.name,
+                    tag: `due-${task.id}-day-before`,
+                    data: { taskId: task.id, type: 'due-reminder' }
+                }
+            );
+        }
+
+        // Schedule due date reminder
+        if (dueDate > now) {
+            this.scheduleNotification(
+                `due-${task.id}-today`,
+                dueDate,
+                'Task Due Today',
+                {
+                    body: task.name,
+                    tag: `due-${task.id}-today`,
+                    data: { taskId: task.id, type: 'due-reminder' }
+                }
+            );
+        }
+    },
+
+    // Cancel due date reminders for a task
+    cancelDueDateReminders(taskId) {
+        this.removeScheduledNotification(`due-${taskId}-day-before`);
+        this.removeScheduledNotification(`due-${taskId}-today`);
+    },
+
+    // Check for overdue tasks and notify
+    checkOverdueTasks() {
+        if (this.getPermission() !== 'granted') return;
+
+        const settings = this.getSettings();
+        if (!settings.overdueAlerts) return;
+
+        const tasks = Storage.getTasks();
+        const overdue = tasks.filter(t => Storage.isOverdue(t));
+
+        if (overdue.length > 0) {
+            const taskNames = overdue.slice(0, 3).map(t => t.name).join(', ');
+            const moreText = overdue.length > 3 ? ` and ${overdue.length - 3} more` : '';
+
+            this.show('Overdue Tasks', {
+                body: taskNames + moreText,
+                tag: 'overdue-alert',
+                data: { type: 'overdue' }
+            });
+        }
+    },
+
+    // Schedule daily reminder
+    scheduleDailyReminder() {
+        const settings = this.getSettings();
+        if (!settings.dailyReminder || this.getPermission() !== 'granted') return;
+
+        const [hours, minutes] = settings.dailyReminderTime.split(':').map(Number);
+        const now = new Date();
+        const reminderTime = new Date();
+        reminderTime.setHours(hours, minutes, 0, 0);
+
+        // If time has passed today, schedule for tomorrow
+        if (reminderTime <= now) {
+            reminderTime.setDate(reminderTime.getDate() + 1);
+        }
+
+        this.scheduleNotification(
+            'daily-reminder',
+            reminderTime,
+            'Check Your Tasks',
+            {
+                body: 'Take a moment to review your tasks for today.',
+                tag: 'daily-reminder',
+                data: { type: 'daily-reminder' }
+            }
+        );
+    },
+
+    // Initialize notifications on app start
+    init() {
+        if (!this.isSupported()) return;
+
+        // Process any pending scheduled notifications
+        this.processScheduledNotifications();
+
+        // Schedule daily reminder if enabled
+        this.scheduleDailyReminder();
+
+        // Check for overdue tasks (once per session)
+        const lastCheck = sessionStorage.getItem('whatnow_overdue_check');
+        if (!lastCheck) {
+            setTimeout(() => {
+                this.checkOverdueTasks();
+                sessionStorage.setItem('whatnow_overdue_check', 'true');
+            }, 5000); // Delay 5 seconds after page load
+        }
+    }
+};

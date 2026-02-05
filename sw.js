@@ -1,5 +1,5 @@
 // Service Worker for What Now? PWA
-const CACHE_NAME = 'whatnow-com-v10';
+const CACHE_NAME = 'whatnow-com-v11';
 const ASSETS = [
     '/',
     '/index.html',
@@ -32,33 +32,26 @@ self.addEventListener('activate', (event) => {
     );
 });
 
-// Fetch - network-first for JS, cache-first for other assets
+// Fetch - network-first for all assets, cache as fallback for offline
 self.addEventListener('fetch', (event) => {
-    const url = new URL(event.request.url);
-
-    // Network-first for JS files (ensures updates load immediately)
-    if (url.pathname.endsWith('.js')) {
-        event.respondWith(
-            fetch(event.request)
-                .then((response) => {
-                    // Update cache with new version
-                    const clone = response.clone();
-                    caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-                    return response;
-                })
-                .catch(() => caches.match(event.request))
-        );
-        return;
-    }
-
-    // Cache-first for other assets
     event.respondWith(
-        caches.match(event.request)
-            .then((response) => response || fetch(event.request))
+        fetch(event.request)
+            .then((response) => {
+                // Update cache with fresh version
+                const clone = response.clone();
+                caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+                return response;
+            })
             .catch(() => {
-                if (event.request.mode === 'navigate') {
-                    return caches.match('/index.html');
-                }
+                // Network failed, try cache
+                return caches.match(event.request)
+                    .then((cached) => {
+                        if (cached) return cached;
+                        // If navigating and no cache, return index.html
+                        if (event.request.mode === 'navigate') {
+                            return caches.match('/index.html');
+                        }
+                    });
             })
     );
 });

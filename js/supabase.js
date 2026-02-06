@@ -71,7 +71,8 @@ const Supabase = {
             throw new Error(errorMsg);
         }
 
-        return response.json();
+        const text = await response.text();
+        return text ? JSON.parse(text) : null;
     },
 
     // Auth: Sign up with email
@@ -315,11 +316,14 @@ class SupabaseQuery {
     }
 
     // Insert
-    async insert(data) {
+    async insert(data, { returning = true } = {}) {
         try {
+            const headers = returning
+                ? { 'Prefer': 'return=representation' }
+                : { 'Prefer': 'return=minimal' };
             const result = await this.client.request(`/rest/v1/${this.table}`, {
                 method: 'POST',
-                headers: { 'Prefer': 'return=representation' },
+                headers,
                 body: JSON.stringify(data)
             });
             return { data: result, error: null };
@@ -489,12 +493,12 @@ const DB = {
 
         if (error) return { data: null, error };
 
-        // Join the group as creator
+        // Join the group as creator (use returning: false to avoid SELECT policy check)
         const memberQuery = new SupabaseQuery(Supabase, 'group_members');
         const { error: joinError } = await memberQuery.insert({
             group_id: data[0].id,
             user_id: userId
-        });
+        }, { returning: false });
 
         if (joinError) {
             return { data: null, error: new Error('Group created but failed to join: ' + (joinError.message || 'RLS policy error. Check Supabase group_members policies.')) };
@@ -516,13 +520,9 @@ const DB = {
         const { error: joinError } = await memberQuery.insert({
             group_id: groups[0].id,
             user_id: userId
-        });
+        }, { returning: false });
 
         if (joinError) {
-            const msg = joinError.message || '';
-            if (msg.includes('infinite recursion')) {
-                return { data: null, error: new Error('Database policy error. The group_members table RLS policies need to be fixed in Supabase.') };
-            }
             return { data: null, error: joinError };
         }
         return { data: groups[0], error: null };

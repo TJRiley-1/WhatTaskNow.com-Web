@@ -1063,8 +1063,15 @@
             <div class="screen-header">
                 <button class="btn-back" data-back="groups">←</button>
                 <h2 id="leaderboard-title">Leaderboard</h2>
+                <button id="btn-edit-group" class="btn btn-small hidden">Edit</button>
             </div>
             <div class="screen-content">
+                <!-- Challenge Section -->
+                <div id="challenge-section" class="challenge-section hidden">
+                    <div id="active-challenge"></div>
+                    <button id="btn-create-challenge" class="btn btn-outline btn-small hidden">New Challenge</button>
+                </div>
+
                 <div class="leaderboard-period">This Week</div>
 
                 <div id="leaderboard-list" class="leaderboard-list">
@@ -1075,13 +1082,71 @@
                     <p>No activity this week yet!</p>
                 </div>
 
+                <!-- Activity Feed -->
+                <div class="activity-feed">
+                    <h3 class="activity-title">Recent Activity</h3>
+                    <div id="activity-list"></div>
+                    <div id="activity-empty" class="hidden">No activity this week</div>
+                </div>
+
+                <!-- Member List -->
+                <div class="member-section">
+                    <h3 class="member-title">Members (<span id="member-count">0</span>)</h3>
+                    <div id="member-list"></div>
+                </div>
+
                 <div class="group-info">
                     <div class="group-code-display">
                         <span class="code-label">Invite Code:</span>
                         <span class="code-value" id="group-invite-code">XXXXXX</span>
                         <button id="btn-copy-code" class="btn btn-small">Copy</button>
+                        <button id="btn-share-code" class="btn btn-small hidden">Share</button>
                     </div>
                     <button id="btn-leave-group" class="btn btn-text btn-danger-text">Leave Group</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Group Modal -->
+        <div id="modal-edit-group" class="modal hidden">
+            <div class="modal-content">
+                <h3>Edit Group</h3>
+                <div class="form-group">
+                    <input type="text" id="edit-group-name" placeholder="Group name" maxlength="30">
+                </div>
+                <div class="form-group">
+                    <input type="text" id="edit-group-desc" placeholder="Description (optional)" maxlength="100">
+                </div>
+                <div class="modal-buttons">
+                    <button id="btn-cancel-edit-group" class="btn btn-outline">Cancel</button>
+                    <button id="btn-save-edit-group" class="btn btn-primary">Save</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Create Challenge Modal -->
+        <div id="modal-create-challenge" class="modal hidden">
+            <div class="modal-content">
+                <h3>New Group Challenge</h3>
+                <div class="form-group">
+                    <input type="text" id="challenge-title" placeholder="Challenge name" maxlength="50">
+                </div>
+                <div class="form-group">
+                    <input type="number" id="challenge-target" placeholder="Target tasks" value="50" min="5" max="500">
+                </div>
+                <div class="form-group">
+                    <input type="number" id="challenge-bonus" placeholder="Bonus points" value="100" min="10" max="1000">
+                </div>
+                <div class="form-group">
+                    <select id="challenge-duration">
+                        <option value="7">1 week</option>
+                        <option value="14">2 weeks</option>
+                        <option value="30">1 month</option>
+                    </select>
+                </div>
+                <div class="modal-buttons">
+                    <button id="btn-cancel-challenge" class="btn btn-outline">Cancel</button>
+                    <button id="btn-save-challenge" class="btn btn-primary">Create</button>
                 </div>
             </div>
         </div>

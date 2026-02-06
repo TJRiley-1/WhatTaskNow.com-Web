@@ -594,5 +594,119 @@ const DB = {
     async leaveGroup(userId, groupId) {
         const query = new SupabaseQuery(Supabase, 'group_members');
         return query.eq('user_id', userId).eq('group_id', groupId).delete();
+    },
+
+    // Update group name/description
+    async updateGroup(groupId, updates) {
+        const query = new SupabaseQuery(Supabase, 'groups');
+        return query.eq('id', groupId).update(updates);
+    },
+
+    // Get group members with profiles
+    async getGroupMembers(groupId) {
+        try {
+            const data = await Supabase.request(
+                `/rest/v1/group_members?select=user_id,joined_at,profiles(id,display_name,avatar_url,current_rank)&group_id=eq.${groupId}`
+            );
+            return { data: data || [], error: null };
+        } catch (e) {
+            return { data: [], error: e };
+        }
+    },
+
+    // Remove member from group (RLS allows group creator)
+    async removeMember(groupId, userId) {
+        const query = new SupabaseQuery(Supabase, 'group_members');
+        return query.eq('group_id', groupId).eq('user_id', userId).delete();
+    },
+
+    // Get recent activity for a group (completed tasks by members, last N days)
+    async getGroupActivity(groupId, days = 7) {
+        try {
+            // First get member user IDs
+            const memberQuery = new SupabaseQuery(Supabase, 'group_members');
+            const { data: members, error: memberError } = await memberQuery.eq('group_id', groupId).execute();
+            if (memberError || !members?.length) return { data: [], error: memberError };
+
+            const userIds = members.map(m => m.user_id);
+            const since = new Date();
+            since.setDate(since.getDate() - days);
+
+            // Fetch completed tasks and profiles in parallel
+            const completedQuery = new SupabaseQuery(Supabase, 'completed_tasks');
+            const profileQuery = new SupabaseQuery(Supabase, 'profiles');
+
+            const [completedResult, profileResult] = await Promise.all([
+                completedQuery.in('user_id', userIds)
+                    .gte('completed_at', since.toISOString())
+                    .order('completed_at', { ascending: false })
+                    .limit(20)
+                    .execute(),
+                profileQuery.in('id', userIds).execute()
+            ]);
+
+            const profiles = {};
+            for (const p of (profileResult.data || [])) {
+                profiles[p.id] = p;
+            }
+
+            const activities = (completedResult.data || []).map(c => ({
+                ...c,
+                display_name: profiles[c.user_id]?.display_name || 'User'
+            }));
+
+            return { data: activities, error: null };
+        } catch (e) {
+            return { data: [], error: e };
+        }
+    },
+
+    // Get active challenge for a group
+    async getActiveChallenge(groupId) {
+        try {
+            const data = await Supabase.request(
+                `/rest/v1/group_challenges?select=*&group_id=eq.${groupId}&end_date=gt.${new Date().toISOString()}&order=created_at.desc&limit=1`
+            );
+            return { data: data?.[0] || null, error: null };
+        } catch (e) {
+            return { data: null, error: e };
+        }
+    },
+
+    // Create a group challenge
+    async createChallenge(groupId, userId, data) {
+        const endDate = new Date();
+        endDate.setDate(endDate.getDate() + (data.duration || 7));
+
+        const query = new SupabaseQuery(Supabase, 'group_challenges');
+        return query.insert({
+            group_id: groupId,
+            title: data.title,
+            target_tasks: data.targetTasks,
+            bonus_points: data.bonusPoints,
+            start_date: new Date().toISOString(),
+            end_date: endDate.toISOString(),
+            created_by: userId
+        });
+    },
+
+    // Get challenge progress (count of completed tasks by group members since start date)
+    async getChallengeProgress(groupId, startDate) {
+        try {
+            const memberQuery = new SupabaseQuery(Supabase, 'group_members');
+            const { data: members, error: memberError } = await memberQuery.eq('group_id', groupId).execute();
+            if (memberError || !members?.length) return { data: 0, error: memberError };
+
+            const userIds = members.map(m => m.user_id);
+            const completedQuery = new SupabaseQuery(Supabase, 'completed_tasks');
+            const { data: tasks, error } = await completedQuery
+                .in('user_id', userIds)
+                .gte('completed_at', startDate)
+                .execute();
+
+            return { data: tasks?.length || 0, error };
+        } catch (e) {
+            return { data: 0, error: e };
+        }
     }
 };

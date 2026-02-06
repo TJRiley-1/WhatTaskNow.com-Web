@@ -1757,8 +1757,38 @@ const App = {
             this.copyInviteCode();
         });
 
+        document.getElementById('btn-share-code').addEventListener('click', () => {
+            this.shareInviteCode();
+        });
+
         document.getElementById('btn-leave-group').addEventListener('click', () => {
             this.leaveGroup();
+        });
+
+        // Edit group
+        document.getElementById('btn-edit-group').addEventListener('click', () => {
+            this.openEditGroupModal();
+        });
+
+        document.getElementById('btn-cancel-edit-group').addEventListener('click', () => {
+            document.getElementById('modal-edit-group').classList.add('hidden');
+        });
+
+        document.getElementById('btn-save-edit-group').addEventListener('click', () => {
+            this.saveGroupEdit();
+        });
+
+        // Challenges
+        document.getElementById('btn-create-challenge').addEventListener('click', () => {
+            this.openCreateChallengeModal();
+        });
+
+        document.getElementById('btn-cancel-challenge').addEventListener('click', () => {
+            document.getElementById('modal-create-challenge').classList.add('hidden');
+        });
+
+        document.getElementById('btn-save-challenge').addEventListener('click', () => {
+            this.saveChallenge();
         });
     },
 
@@ -2136,17 +2166,22 @@ const App = {
         container.classList.remove('hidden');
         noGroups.classList.add('hidden');
 
+        // Store groups for later reference
+        this._groupsCache = {};
+        groups.forEach(g => this._groupsCache[g.id] = g);
+
         container.innerHTML = groups.map(group => `
-            <div class="group-item" data-id="${group.id}" data-code="${group.invite_code}">
+            <div class="group-item" data-id="${group.id}">
                 <div class="group-item-name">${this.escapeHtml(group.name)}</div>
-                <div class="group-item-meta">${group.description || 'No description'}</div>
+                <div class="group-item-meta">${this.escapeHtml(group.description || 'No description')}</div>
             </div>
         `).join('');
 
         // Bind click events
         container.querySelectorAll('.group-item').forEach(item => {
             item.addEventListener('click', () => {
-                this.openLeaderboard(item.dataset.id, item.dataset.code);
+                const group = this._groupsCache[item.dataset.id];
+                if (group) this.openLeaderboard(group);
             });
         });
     },
@@ -2182,7 +2217,7 @@ const App = {
 
             // Open the newly created group's leaderboard so user can see invite code
             if (data && data.id) {
-                await this.openLeaderboard(data.id, data.invite_code);
+                await this.openLeaderboard(data);
             } else {
                 await this.renderGroups();
                 this.showScreen('groups');
@@ -2229,10 +2264,31 @@ const App = {
     },
 
     // Open leaderboard for a group
-    async openLeaderboard(groupId, inviteCode) {
-        this.currentGroup = { id: groupId, invite_code: inviteCode };
+    async openLeaderboard(group) {
+        // Accept full group object or legacy (groupId, inviteCode) args
+        if (typeof group === 'string') {
+            group = { id: group, invite_code: arguments[1] };
+        }
+        this.currentGroup = group;
 
-        document.getElementById('group-invite-code').textContent = inviteCode;
+        document.getElementById('group-invite-code').textContent = group.invite_code;
+        document.getElementById('leaderboard-title').textContent = this.escapeHtml(group.name || 'Leaderboard');
+
+        // Show/hide edit button for group creator
+        const editBtn = document.getElementById('btn-edit-group');
+        if (group.created_by === this.user?.id) {
+            editBtn.classList.remove('hidden');
+        } else {
+            editBtn.classList.add('hidden');
+        }
+
+        // Show share button if Web Share API is available
+        const shareBtn = document.getElementById('btn-share-code');
+        if (navigator.share) {
+            shareBtn.classList.remove('hidden');
+        } else {
+            shareBtn.classList.add('hidden');
+        }
 
         const container = document.getElementById('leaderboard-list');
         const emptyEl = document.getElementById('leaderboard-empty');
@@ -2241,43 +2297,47 @@ const App = {
         this.showScreen('leaderboard');
 
         try {
-            const { data: leaderboard, error } = await DB.getLeaderboard(groupId);
+            const { data: leaderboard, error } = await DB.getLeaderboard(group.id);
 
             if (error || !leaderboard || leaderboard.length === 0) {
                 container.classList.add('hidden');
                 emptyEl.classList.remove('hidden');
-                return;
+            } else {
+                container.classList.remove('hidden');
+                emptyEl.classList.add('hidden');
+
+                container.innerHTML = leaderboard.map((entry, index) => {
+                    const isMe = entry.user_id === this.user?.id;
+                    const initial = (entry.display_name?.[0] || '?').toUpperCase();
+
+                    return `
+                        <div class="leaderboard-item${isMe ? ' is-me' : ''}">
+                            <div class="leaderboard-position">${index + 1}</div>
+                            <div class="leaderboard-avatar">
+                                ${this.sanitizeUrl(entry.avatar_url)
+                                    ? `<img src="${this.sanitizeUrl(entry.avatar_url)}" alt="">`
+                                    : `<span>${initial}</span>`}
+                            </div>
+                            <div class="leaderboard-info">
+                                <div class="leaderboard-name">${this.escapeHtml(entry.display_name || 'User')}</div>
+                                <div class="leaderboard-rank">${entry.current_rank || 'Task Newbie'}</div>
+                            </div>
+                            <div class="leaderboard-stats">
+                                <div class="leaderboard-points">${entry.weekly_points} pts</div>
+                                <div class="leaderboard-tasks">${entry.weekly_tasks} tasks</div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
             }
-
-            container.classList.remove('hidden');
-            emptyEl.classList.add('hidden');
-
-            container.innerHTML = leaderboard.map((entry, index) => {
-                const isMe = entry.user_id === this.user?.id;
-                const initial = (entry.display_name?.[0] || '?').toUpperCase();
-
-                return `
-                    <div class="leaderboard-item${isMe ? ' is-me' : ''}">
-                        <div class="leaderboard-position">${index + 1}</div>
-                        <div class="leaderboard-avatar">
-                            ${this.sanitizeUrl(entry.avatar_url)
-                                ? `<img src="${this.sanitizeUrl(entry.avatar_url)}" alt="">`
-                                : `<span>${initial}</span>`}
-                        </div>
-                        <div class="leaderboard-info">
-                            <div class="leaderboard-name">${this.escapeHtml(entry.display_name || 'User')}</div>
-                            <div class="leaderboard-rank">${entry.current_rank || 'Task Newbie'}</div>
-                        </div>
-                        <div class="leaderboard-stats">
-                            <div class="leaderboard-points">${entry.weekly_points} pts</div>
-                            <div class="leaderboard-tasks">${entry.weekly_tasks} tasks</div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
         } catch (e) {
             container.innerHTML = '<div class="error">Failed to load leaderboard</div>';
         }
+
+        // Load additional sections in parallel
+        this.renderActivityFeed(group.id);
+        this.renderMemberList(group.id);
+        this.renderChallenge(group.id);
     },
 
     // Copy invite code
@@ -2288,6 +2348,260 @@ const App = {
             btn.textContent = 'Copied!';
             setTimeout(() => btn.textContent = 'Copy', 2000);
         });
+    },
+
+    // Share invite code via Web Share API
+    shareInviteCode() {
+        const group = this.currentGroup;
+        if (!group) return;
+
+        const text = `Join my group "${group.name || 'my group'}" on What Now! Use invite code: ${group.invite_code}`;
+
+        if (navigator.share) {
+            navigator.share({ title: 'Join my What Now group', text }).catch(() => {});
+        } else {
+            // Fallback to copy
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = document.getElementById('btn-share-code');
+                btn.textContent = 'Copied!';
+                setTimeout(() => btn.textContent = 'Share', 2000);
+            });
+        }
+    },
+
+    // Open edit group modal
+    openEditGroupModal() {
+        const group = this.currentGroup;
+        if (!group) return;
+
+        document.getElementById('edit-group-name').value = group.name || '';
+        document.getElementById('edit-group-desc').value = group.description || '';
+        document.getElementById('modal-edit-group').classList.remove('hidden');
+        document.getElementById('edit-group-name').focus();
+    },
+
+    // Save group edits
+    async saveGroupEdit() {
+        const group = this.currentGroup;
+        if (!group) return;
+
+        const name = document.getElementById('edit-group-name').value.trim();
+        const description = document.getElementById('edit-group-desc').value.trim();
+
+        if (!name) return;
+
+        const btn = document.getElementById('btn-save-edit-group');
+        btn.disabled = true;
+        btn.textContent = 'Saving...';
+
+        try {
+            const { error } = await DB.updateGroup(group.id, { name, description });
+            if (error) throw error;
+
+            // Update cached group
+            this.currentGroup.name = name;
+            this.currentGroup.description = description;
+            document.getElementById('leaderboard-title').textContent = this.escapeHtml(name);
+
+            document.getElementById('modal-edit-group').classList.add('hidden');
+        } catch (e) {
+            alert('Failed to update group: ' + (e.message || 'Unknown error'));
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Save';
+        }
+    },
+
+    // Render activity feed
+    async renderActivityFeed(groupId) {
+        const listEl = document.getElementById('activity-list');
+        const emptyEl = document.getElementById('activity-empty');
+
+        listEl.innerHTML = '';
+        emptyEl.classList.add('hidden');
+
+        const { data: activities } = await DB.getGroupActivity(groupId);
+
+        if (!activities || activities.length === 0) {
+            emptyEl.classList.remove('hidden');
+            return;
+        }
+
+        listEl.innerHTML = activities.map(a => {
+            const timeAgo = this.formatTimeAgo(a.completed_at);
+            return `
+                <div class="activity-item">
+                    <div class="activity-text">
+                        <strong>${this.escapeHtml(a.display_name)}</strong> completed
+                        <em>${this.escapeHtml(a.task_name)}</em>
+                        — <span class="activity-points">+${a.points} pts</span>
+                    </div>
+                    <div class="activity-time">${timeAgo}</div>
+                </div>
+            `;
+        }).join('');
+    },
+
+    // Format relative time
+    formatTimeAgo(dateStr) {
+        const now = new Date();
+        const date = new Date(dateStr);
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+
+        if (diffMins < 1) return 'just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        const diffHours = Math.floor(diffMins / 60);
+        if (diffHours < 24) return `${diffHours}h ago`;
+        const diffDays = Math.floor(diffHours / 24);
+        return `${diffDays}d ago`;
+    },
+
+    // Render member list
+    async renderMemberList(groupId) {
+        const listEl = document.getElementById('member-list');
+        const countEl = document.getElementById('member-count');
+
+        listEl.innerHTML = '';
+
+        const { data: members } = await DB.getGroupMembers(groupId);
+
+        if (!members || members.length === 0) {
+            countEl.textContent = '0';
+            return;
+        }
+
+        countEl.textContent = members.length;
+        const isCreator = this.currentGroup?.created_by === this.user?.id;
+
+        listEl.innerHTML = members.map(m => {
+            const profile = m.profiles || {};
+            const initial = (profile.display_name?.[0] || '?').toUpperCase();
+            const isSelf = m.user_id === this.user?.id;
+            const showRemove = isCreator && !isSelf;
+
+            return `
+                <div class="member-item">
+                    <div class="member-avatar">
+                        ${this.sanitizeUrl(profile.avatar_url)
+                            ? `<img src="${this.sanitizeUrl(profile.avatar_url)}" alt="">`
+                            : `<span>${initial}</span>`}
+                    </div>
+                    <div class="member-info">
+                        <div class="member-name">${this.escapeHtml(profile.display_name || 'User')}${isSelf ? ' (you)' : ''}</div>
+                        <div class="member-rank">${profile.current_rank || 'Task Newbie'}</div>
+                    </div>
+                    ${showRemove ? `<button class="btn btn-small btn-danger-text btn-remove-member" data-user-id="${m.user_id}">Remove</button>` : ''}
+                </div>
+            `;
+        }).join('');
+
+        // Bind remove buttons
+        listEl.querySelectorAll('.btn-remove-member').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.removeMember(groupId, btn.dataset.userId);
+            });
+        });
+    },
+
+    // Remove a member from the group
+    async removeMember(groupId, userId) {
+        if (!confirm('Remove this member from the group?')) return;
+
+        try {
+            const { error } = await DB.removeMember(groupId, userId);
+            if (error) throw error;
+            await this.renderMemberList(groupId);
+        } catch (e) {
+            alert('Failed to remove member: ' + (e.message || 'Unknown error'));
+        }
+    },
+
+    // Render challenge section
+    async renderChallenge(groupId) {
+        const section = document.getElementById('challenge-section');
+        const activeEl = document.getElementById('active-challenge');
+        const createBtn = document.getElementById('btn-create-challenge');
+        const isCreator = this.currentGroup?.created_by === this.user?.id;
+
+        section.classList.remove('hidden');
+
+        const { data: challenge } = await DB.getActiveChallenge(groupId);
+
+        if (!challenge) {
+            activeEl.innerHTML = '';
+            if (isCreator) {
+                createBtn.classList.remove('hidden');
+            } else {
+                createBtn.classList.add('hidden');
+                section.classList.add('hidden');
+            }
+            return;
+        }
+
+        createBtn.classList.add('hidden');
+
+        // Get progress
+        const { data: completed } = await DB.getChallengeProgress(groupId, challenge.start_date);
+        const progress = Math.min(completed, challenge.target_tasks);
+        const pct = Math.round((progress / challenge.target_tasks) * 100);
+
+        const endDate = new Date(challenge.end_date);
+        const daysLeft = Math.max(0, Math.ceil((endDate - new Date()) / (1000 * 60 * 60 * 24)));
+
+        activeEl.innerHTML = `
+            <div class="challenge-card">
+                <div class="challenge-header">
+                    <div class="challenge-name">${this.escapeHtml(challenge.title)}</div>
+                    <div class="challenge-meta">${daysLeft} day${daysLeft !== 1 ? 's' : ''} left &middot; +${challenge.bonus_points} bonus pts</div>
+                </div>
+                <div class="challenge-progress-bar">
+                    <div class="challenge-progress-fill" style="width: ${pct}%"></div>
+                </div>
+                <div class="challenge-progress-text">${progress} / ${challenge.target_tasks} tasks (${pct}%)</div>
+            </div>
+        `;
+    },
+
+    // Open create challenge modal
+    openCreateChallengeModal() {
+        document.getElementById('challenge-title').value = '';
+        document.getElementById('challenge-target').value = '50';
+        document.getElementById('challenge-bonus').value = '100';
+        document.getElementById('challenge-duration').value = '7';
+        document.getElementById('modal-create-challenge').classList.remove('hidden');
+        document.getElementById('challenge-title').focus();
+    },
+
+    // Save new challenge
+    async saveChallenge() {
+        const title = document.getElementById('challenge-title').value.trim();
+        const targetTasks = parseInt(document.getElementById('challenge-target').value) || 50;
+        const bonusPoints = parseInt(document.getElementById('challenge-bonus').value) || 100;
+        const duration = parseInt(document.getElementById('challenge-duration').value) || 7;
+
+        if (!title) return;
+        if (!this.currentGroup || !this.isLoggedIn) return;
+
+        const btn = document.getElementById('btn-save-challenge');
+        btn.disabled = true;
+        btn.textContent = 'Creating...';
+
+        try {
+            const { error } = await DB.createChallenge(this.currentGroup.id, this.user.id, {
+                title, targetTasks, bonusPoints, duration
+            });
+            if (error) throw error;
+
+            document.getElementById('modal-create-challenge').classList.add('hidden');
+            await this.renderChallenge(this.currentGroup.id);
+        } catch (e) {
+            alert('Failed to create challenge: ' + (e.message || 'Unknown error'));
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Create';
+        }
     },
 
     // Leave group

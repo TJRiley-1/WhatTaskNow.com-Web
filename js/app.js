@@ -327,7 +327,18 @@ const App = {
         });
 
         document.getElementById('btn-not-now').addEventListener('click', () => {
+            // Skip this task and show the next card
+            const task = this.acceptedTask;
+            if (task && !task.isFallback) {
+                Storage.updateTask(task.id, {
+                    timesShown: (task.timesShown || 0) + 1,
+                    timesSkipped: (task.timesSkipped || 0) + 1
+                });
+            }
+            this.acceptedTask = null;
+            this.currentCardIndex++;
             this.showScreen('swipe');
+            this.renderCards();
         });
 
         // Timer controls
@@ -2157,6 +2168,10 @@ const App = {
             return;
         }
 
+        const btn = document.getElementById('btn-confirm-create-group');
+        btn.disabled = true;
+        btn.textContent = 'Creating...';
+
         try {
             const { data, error } = await DB.createGroup(this.user.id, name, desc);
             if (error) throw error;
@@ -2165,10 +2180,18 @@ const App = {
             document.getElementById('group-desc').value = '';
             document.getElementById('modal-create-group').classList.add('hidden');
 
-            await this.renderGroups();
-            this.showScreen('groups');
+            // Open the newly created group's leaderboard so user can see invite code
+            if (data && data.id) {
+                await this.openLeaderboard(data.id, data.invite_code);
+            } else {
+                await this.renderGroups();
+                this.showScreen('groups');
+            }
         } catch (e) {
-            alert('Failed to create group: ' + e.message);
+            alert('Failed to create group: ' + (e.message || 'Unknown error'));
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Create';
         }
     },
 

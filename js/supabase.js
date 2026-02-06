@@ -489,12 +489,16 @@ const DB = {
 
         if (error) return { data: null, error };
 
-        // Join the group
+        // Join the group as creator
         const memberQuery = new SupabaseQuery(Supabase, 'group_members');
-        await memberQuery.insert({
+        const { error: joinError } = await memberQuery.insert({
             group_id: data[0].id,
             user_id: userId
         });
+
+        if (joinError) {
+            return { data: null, error: new Error('Group created but failed to join: ' + (joinError.message || 'RLS policy error. Check Supabase group_members policies.')) };
+        }
 
         return { data: data[0], error: null };
     },
@@ -514,7 +518,13 @@ const DB = {
             user_id: userId
         });
 
-        if (joinError) return { data: null, error: joinError };
+        if (joinError) {
+            const msg = joinError.message || '';
+            if (msg.includes('infinite recursion')) {
+                return { data: null, error: new Error('Database policy error. The group_members table RLS policies need to be fixed in Supabase.') };
+            }
+            return { data: null, error: joinError };
+        }
         return { data: groups[0], error: null };
     },
 

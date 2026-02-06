@@ -57,7 +57,7 @@ body {
     opacity: 0;
     visibility: hidden;
     transform: translateX(100%);
-    transition: all 0.3s ease;
+    transition: opacity 0.3s ease, visibility 0.3s ease, transform 0.3s ease;
 }
 
 .screen.active {
@@ -1164,12 +1164,6 @@ body {
     text-align: center;
 }
 
-.login-buttons {
-    width: 100%;
-    max-width: 300px;
-    margin-bottom: 24px;
-}
-
 .btn-google {
     background: white;
     color: #333;
@@ -1225,6 +1219,9 @@ body {
 }
 
 .login-buttons {
+    width: 100%;
+    max-width: 300px;
+    margin-bottom: 24px;
     display: flex;
     flex-direction: column;
     gap: 12px;

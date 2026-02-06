@@ -37,16 +37,71 @@ const Storage = {
         { name: 'Clear kitchen counter', desc: 'Just the counter, nothing else', type: 'Chores', time: 10, social: 'low', energy: 'low' }
     ],
 
+    // Auto-incrementing counter for unique IDs
+    _idCounter: 0,
+
+    // In-memory cache to avoid repeated JSON.parse on localStorage reads
+    _cache: {},
+
+    _getItem(key, fallback) {
+        if (this._cache[key] !== undefined) {
+            // Return a deep copy to prevent mutation of cached data
+            return JSON.parse(JSON.stringify(this._cache[key]));
+        }
+        const raw = localStorage.getItem(key);
+        if (raw === null) return fallback;
+        try {
+            this._cache[key] = JSON.parse(raw);
+            return JSON.parse(raw);
+        } catch (e) {
+            return fallback;
+        }
+    },
+
+    // Safe localStorage write with quota error handling and cache invalidation
+    _setItem(key, value) {
+        // Update in-memory cache
+        try {
+            this._cache[key] = JSON.parse(value);
+        } catch (e) {
+            delete this._cache[key];
+        }
+        try {
+            localStorage.setItem(key, value);
+        } catch (e) {
+            if (e.name === 'QuotaExceededError' || e.code === 22) {
+                // Try to free space by trimming completed tasks and points history
+                try {
+                    const completed = JSON.parse(localStorage.getItem(this.KEYS.COMPLETED) || '[]');
+                    if (completed.length > 50) {
+                        localStorage.setItem(this.KEYS.COMPLETED, JSON.stringify(completed.slice(-50)));
+                    }
+                    const stats = JSON.parse(localStorage.getItem(this.KEYS.STATS) || '{}');
+                    if (stats.pointsHistory && stats.pointsHistory.length > 20) {
+                        stats.pointsHistory = stats.pointsHistory.slice(-20);
+                        localStorage.setItem(this.KEYS.STATS, JSON.stringify(stats));
+                    }
+                    // Retry the original write
+                    localStorage.setItem(key, value);
+                } catch (retryError) {
+                    console.error('Storage quota exceeded, unable to save:', key);
+                }
+            } else {
+                console.error('localStorage write error:', e);
+            }
+        }
+    },
+
     // Initialize storage with defaults if needed
     init() {
         if (!localStorage.getItem(this.KEYS.TASK_TYPES)) {
-            localStorage.setItem(this.KEYS.TASK_TYPES, JSON.stringify(this.DEFAULT_TYPES));
+            this._setItem(this.KEYS.TASK_TYPES, JSON.stringify(this.DEFAULT_TYPES));
         }
         if (!localStorage.getItem(this.KEYS.TASKS)) {
-            localStorage.setItem(this.KEYS.TASKS, JSON.stringify([]));
+            this._setItem(this.KEYS.TASKS, JSON.stringify([]));
         }
         if (!localStorage.getItem(this.KEYS.STATS)) {
-            localStorage.setItem(this.KEYS.STATS, JSON.stringify({
+            this._setItem(this.KEYS.STATS, JSON.stringify({
                 completed: 0,
                 skipped: 0,
                 totalPoints: 0,
@@ -55,59 +110,59 @@ const Storage = {
             }));
         } else {
             // Migrate existing stats to include new fields
-            const stats = JSON.parse(localStorage.getItem(this.KEYS.STATS));
+            const stats = this._getItem(this.KEYS.STATS, {});
             if (stats.totalPoints === undefined) {
                 stats.totalPoints = 0;
                 stats.totalTimeSpent = 0;
                 stats.pointsHistory = [];
-                localStorage.setItem(this.KEYS.STATS, JSON.stringify(stats));
+                this._setItem(this.KEYS.STATS, JSON.stringify(stats));
             }
         }
         if (!localStorage.getItem(this.KEYS.TEMPLATES)) {
-            localStorage.setItem(this.KEYS.TEMPLATES, JSON.stringify([]));
+            this._setItem(this.KEYS.TEMPLATES, JSON.stringify([]));
         }
         if (!localStorage.getItem(this.KEYS.COMPLETED)) {
-            localStorage.setItem(this.KEYS.COMPLETED, JSON.stringify([]));
+            this._setItem(this.KEYS.COMPLETED, JSON.stringify([]));
         }
         if (!localStorage.getItem(this.KEYS.PENDING_IMPORT)) {
-            localStorage.setItem(this.KEYS.PENDING_IMPORT, JSON.stringify([]));
+            this._setItem(this.KEYS.PENDING_IMPORT, JSON.stringify([]));
         }
     },
 
     // Task Types
     getTaskTypes() {
-        return JSON.parse(localStorage.getItem(this.KEYS.TASK_TYPES)) || this.DEFAULT_TYPES;
+        return this._getItem(this.KEYS.TASK_TYPES, this.DEFAULT_TYPES);
     },
 
     addTaskType(type) {
         const types = this.getTaskTypes();
         if (!types.includes(type)) {
             types.push(type);
-            localStorage.setItem(this.KEYS.TASK_TYPES, JSON.stringify(types));
+            this._setItem(this.KEYS.TASK_TYPES, JSON.stringify(types));
         }
         return types;
     },
 
     removeTaskType(type) {
         const types = this.getTaskTypes().filter(t => t !== type);
-        localStorage.setItem(this.KEYS.TASK_TYPES, JSON.stringify(types));
+        this._setItem(this.KEYS.TASK_TYPES, JSON.stringify(types));
         return types;
     },
 
     // Tasks
     getTasks() {
-        return JSON.parse(localStorage.getItem(this.KEYS.TASKS)) || [];
+        return this._getItem(this.KEYS.TASKS, []);
     },
 
     addTask(task) {
         const tasks = this.getTasks();
-        task.id = Date.now().toString();
+        task.id = Date.now().toString() + '_' + (this._idCounter++);
         task.created = new Date().toISOString();
         task.timesShown = 0;
         task.timesSkipped = 0;
         task.timesCompleted = 0;
         tasks.push(task);
-        localStorage.setItem(this.KEYS.TASKS, JSON.stringify(tasks));
+        this._setItem(this.KEYS.TASKS, JSON.stringify(tasks));
         return task;
     },
 
@@ -116,7 +171,7 @@ const Storage = {
         const index = tasks.findIndex(t => t.id === id);
         if (index !== -1) {
             tasks[index] = { ...tasks[index], ...updates };
-            localStorage.setItem(this.KEYS.TASKS, JSON.stringify(tasks));
+            this._setItem(this.KEYS.TASKS, JSON.stringify(tasks));
             return tasks[index];
         }
         return null;
@@ -124,7 +179,7 @@ const Storage = {
 
     deleteTask(id) {
         const tasks = this.getTasks().filter(t => t.id !== id);
-        localStorage.setItem(this.KEYS.TASKS, JSON.stringify(tasks));
+        this._setItem(this.KEYS.TASKS, JSON.stringify(tasks));
         return tasks;
     },
 
@@ -188,12 +243,16 @@ const Storage = {
         return nextDue.toISOString().split('T')[0];
     },
 
+    // Level lookup constants (shared between findMatchingTasks and getFallbackTasks)
+    ENERGY_LEVELS: { low: 1, medium: 2, high: 3 },
+    SOCIAL_LEVELS: { low: 1, medium: 2, high: 3 },
+
     // Find matching tasks based on current state
     // Unselected filters are treated as "match all" (no filtering on that dimension)
     findMatchingTasks(energy, social, time) {
         const tasks = this.getTasks();
-        const energyLevels = { low: 1, medium: 2, high: 3 };
-        const socialLevels = { low: 1, medium: 2, high: 3 };
+        const energyLevels = this.ENERGY_LEVELS;
+        const socialLevels = this.SOCIAL_LEVELS;
 
         // Filter tasks that match current state
         // Task requires X energy/social, user has Y - user can do task if Y >= X
@@ -225,8 +284,8 @@ const Storage = {
     // Get fallback tasks that match current state
     // Unselected filters are treated as "match all" (no filtering on that dimension)
     getFallbackTasks(energy, social, time) {
-        const energyLevels = { low: 1, medium: 2, high: 3 };
-        const socialLevels = { low: 1, medium: 2, high: 3 };
+        const energyLevels = this.ENERGY_LEVELS;
+        const socialLevels = this.SOCIAL_LEVELS;
 
         return this.FALLBACK_TASKS.filter(task => {
             const energyMatch = !energy || energyLevels[energy] >= energyLevels[task.energy];
@@ -235,14 +294,14 @@ const Storage = {
             return energyMatch && socialMatch && timeMatch;
         }).map(task => ({
             ...task,
-            id: 'fallback_' + Math.random().toString(36).substr(2, 9),
+            id: 'fallback_' + Math.random().toString(36).substring(2, 11),
             isFallback: true
         }));
     },
 
     // Templates
     getTemplates() {
-        return JSON.parse(localStorage.getItem(this.KEYS.TEMPLATES)) || [];
+        return this._getItem(this.KEYS.TEMPLATES, []);
     },
 
     addTemplate(template) {
@@ -250,19 +309,19 @@ const Storage = {
         template.id = 'tpl_' + Date.now().toString();
         template.created = new Date().toISOString();
         templates.push(template);
-        localStorage.setItem(this.KEYS.TEMPLATES, JSON.stringify(templates));
+        this._setItem(this.KEYS.TEMPLATES, JSON.stringify(templates));
         return template;
     },
 
     deleteTemplate(id) {
         const templates = this.getTemplates().filter(t => t.id !== id);
-        localStorage.setItem(this.KEYS.TEMPLATES, JSON.stringify(templates));
+        this._setItem(this.KEYS.TEMPLATES, JSON.stringify(templates));
         return templates;
     },
 
     // Completed tasks history
     getCompletedTasks() {
-        return JSON.parse(localStorage.getItem(this.KEYS.COMPLETED)) || [];
+        return this._getItem(this.KEYS.COMPLETED, []);
     },
 
     addCompletedTask(task, points, timeSpent) {
@@ -279,7 +338,7 @@ const Storage = {
         if (completed.length > 200) {
             completed.splice(0, completed.length - 200);
         }
-        localStorage.setItem(this.KEYS.COMPLETED, JSON.stringify(completed));
+        this._setItem(this.KEYS.COMPLETED, JSON.stringify(completed));
         return completed;
     },
 
@@ -327,28 +386,28 @@ const Storage = {
 
     // Pending imports
     getPendingImports() {
-        return JSON.parse(localStorage.getItem(this.KEYS.PENDING_IMPORT)) || [];
+        return this._getItem(this.KEYS.PENDING_IMPORT, []);
     },
 
     addPendingImport(name) {
         const pending = this.getPendingImports();
         pending.push({
-            id: 'imp_' + Date.now().toString() + '_' + Math.random().toString(36).substr(2, 5),
+            id: 'imp_' + Date.now().toString() + '_' + Math.random().toString(36).substring(2, 7),
             name: name.trim(),
             created: new Date().toISOString()
         });
-        localStorage.setItem(this.KEYS.PENDING_IMPORT, JSON.stringify(pending));
+        this._setItem(this.KEYS.PENDING_IMPORT, JSON.stringify(pending));
         return pending;
     },
 
     removePendingImport(id) {
         const pending = this.getPendingImports().filter(p => p.id !== id);
-        localStorage.setItem(this.KEYS.PENDING_IMPORT, JSON.stringify(pending));
+        this._setItem(this.KEYS.PENDING_IMPORT, JSON.stringify(pending));
         return pending;
     },
 
     clearPendingImports() {
-        localStorage.setItem(this.KEYS.PENDING_IMPORT, JSON.stringify([]));
+        this._setItem(this.KEYS.PENDING_IMPORT, JSON.stringify([]));
     },
 
     // Parse imported text
@@ -402,26 +461,26 @@ const Storage = {
 
     // Stats
     getStats() {
-        return JSON.parse(localStorage.getItem(this.KEYS.STATS)) || {
+        return this._getItem(this.KEYS.STATS, {
             completed: 0,
             skipped: 0,
             totalPoints: 0,
             totalTimeSpent: 0,
             pointsHistory: []
-        };
+        });
     },
 
     incrementCompleted() {
         const stats = this.getStats();
         stats.completed++;
-        localStorage.setItem(this.KEYS.STATS, JSON.stringify(stats));
+        this._setItem(this.KEYS.STATS, JSON.stringify(stats));
         return stats;
     },
 
     incrementSkipped() {
         const stats = this.getStats();
         stats.skipped++;
-        localStorage.setItem(this.KEYS.STATS, JSON.stringify(stats));
+        this._setItem(this.KEYS.STATS, JSON.stringify(stats));
         return stats;
     },
 
@@ -450,14 +509,14 @@ const Storage = {
         if (stats.pointsHistory.length > 100) {
             stats.pointsHistory = stats.pointsHistory.slice(-100);
         }
-        localStorage.setItem(this.KEYS.STATS, JSON.stringify(stats));
+        this._setItem(this.KEYS.STATS, JSON.stringify(stats));
         return stats;
     },
 
     addTimeSpent(minutes) {
         const stats = this.getStats();
         stats.totalTimeSpent += minutes;
-        localStorage.setItem(this.KEYS.STATS, JSON.stringify(stats));
+        this._setItem(this.KEYS.STATS, JSON.stringify(stats));
         return stats;
     },
 

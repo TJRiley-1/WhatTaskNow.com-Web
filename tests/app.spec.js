@@ -1,11 +1,17 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
 
-// Clear localStorage before each test
+// Clear localStorage before each test, mark onboarding complete
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
-  await page.evaluate(() => localStorage.clear());
+  await page.waitForLoadState('networkidle');
+  await page.evaluate(() => {
+    localStorage.clear();
+    localStorage.setItem('whatnow_onboarding_complete', 'true');
+  });
   await page.reload();
+  await page.waitForLoadState('networkidle');
+  await page.waitForSelector('#screen-home.active', { timeout: 10000 });
 });
 
 test.describe('Home Screen', () => {
@@ -14,8 +20,9 @@ test.describe('Home Screen', () => {
     await expect(page.locator('#btn-add-task')).toBeVisible();
     await expect(page.locator('#btn-what-next')).toBeVisible();
     await expect(page.locator('#btn-manage-tasks')).toBeVisible();
-    await expect(page.locator('#btn-gallery')).toBeVisible();
-    await expect(page.locator('#btn-profile')).toBeVisible();
+    // Gallery and Profile are now in bottom nav
+    await expect(page.locator('.nav-item[data-screen="gallery"]')).toBeVisible();
+    await expect(page.locator('.nav-item[data-screen="profile"]')).toBeVisible();
   });
 
   test('rank display hidden when no points', async ({ page }) => {
@@ -301,7 +308,7 @@ test.describe('Import', () => {
 
 test.describe('Gallery', () => {
   test('shows empty state when no completed tasks', async ({ page }) => {
-    await page.click('#btn-gallery');
+    await page.click('.nav-item[data-screen="gallery"]');
     await expect(page.locator('#screen-gallery')).toHaveClass(/active/);
     await expect(page.locator('#no-completed')).not.toHaveClass(/hidden/);
   });
@@ -334,7 +341,7 @@ test.describe('Gallery', () => {
     await page.click('#btn-celebration-done');
 
     // Check gallery
-    await page.click('#btn-gallery');
+    await page.click('.nav-item[data-screen="gallery"]');
     await expect(page.locator('#gallery-total-tasks')).toHaveText('1');
     await expect(page.locator('.gallery-item')).toHaveCount(1);
     await expect(page.locator('.gallery-item')).toContainText('Test Chore');

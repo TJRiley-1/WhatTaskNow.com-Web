@@ -1,5 +1,5 @@
 // Service Worker for What Now? PWA
-const CACHE_NAME = 'whatnow-com-v11';
+const CACHE_NAME = 'whatnow-com-v12';
 const ASSETS = [
     '/',
     '/index.html',
@@ -11,7 +11,7 @@ const ASSETS = [
     '/icons/icon.svg'
 ];
 
-// Install - cache assets
+// Install - cache assets and activate immediately
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME)
@@ -20,7 +20,7 @@ self.addEventListener('install', (event) => {
     );
 });
 
-// Activate - clean old caches
+// Activate - clean old caches and take control immediately
 self.addEventListener('activate', (event) => {
     event.waitUntil(
         caches.keys()
@@ -32,14 +32,23 @@ self.addEventListener('activate', (event) => {
     );
 });
 
-// Fetch - network-first for all assets, cache as fallback for offline
+// Fetch - network-first for same-origin assets, skip caching for API calls
 self.addEventListener('fetch', (event) => {
+    const url = new URL(event.request.url);
+
+    // Don't cache cross-origin requests (Supabase API, etc.)
+    if (url.origin !== self.location.origin) {
+        return;
+    }
+
     event.respondWith(
         fetch(event.request)
             .then((response) => {
-                // Update cache with fresh version
-                const clone = response.clone();
-                caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+                // Only cache successful same-origin responses
+                if (response.ok) {
+                    const clone = response.clone();
+                    caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+                }
                 return response;
             })
             .catch(() => {
@@ -76,4 +85,11 @@ self.addEventListener('notificationclick', (event) => {
                 }
             })
     );
+});
+
+// Listen for skip waiting message from the app
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'SKIP_WAITING') {
+        self.skipWaiting();
+    }
 });

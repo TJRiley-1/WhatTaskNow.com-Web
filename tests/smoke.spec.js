@@ -1,6 +1,16 @@
 // Smoke test - check for console errors and basic functionality
 const { test, expect } = require('@playwright/test');
 
+// Helper to clear state and skip onboarding
+async function resetApp(page) {
+  await page.evaluate(() => {
+    localStorage.clear();
+    localStorage.setItem('whatnow_onboarding_complete', 'true');
+  });
+  await page.reload();
+  await page.waitForSelector('#screen-home.active', { timeout: 5000 });
+}
+
 test.describe('Smoke Tests', () => {
   test('no console errors on page load', async ({ page }) => {
     const errors = [];
@@ -14,6 +24,10 @@ test.describe('Smoke Tests', () => {
     });
 
     await page.goto('/');
+    await page.evaluate(() => {
+      localStorage.setItem('whatnow_onboarding_complete', 'true');
+    });
+    await page.reload();
     await page.waitForLoadState('networkidle');
 
     // Filter out expected errors (like service worker on localhost)
@@ -27,8 +41,7 @@ test.describe('Smoke Tests', () => {
 
   test('all screens can be accessed', async ({ page }) => {
     await page.goto('/');
-    await page.evaluate(() => localStorage.clear());
-    await page.reload();
+    await resetApp(page);
 
     // Home screen
     await expect(page.locator('#screen-home')).toHaveClass(/active/);
@@ -48,22 +61,21 @@ test.describe('Smoke Tests', () => {
     await expect(page.locator('#screen-manage')).toHaveClass(/active/);
     await page.click('#screen-manage .btn-back');
 
-    // Gallery
-    await page.click('#btn-gallery');
+    // Gallery (via bottom nav)
+    await page.click('.nav-item[data-screen="gallery"]');
     await expect(page.locator('#screen-gallery')).toHaveClass(/active/);
     await page.click('#screen-gallery .btn-back');
 
-    // Profile
-    await page.click('#btn-profile');
+    // Profile (via bottom nav)
+    await page.click('.nav-item[data-screen="profile"]');
     await expect(page.locator('#screen-profile')).toHaveClass(/active/);
   });
 
   test('profile shows guest state when not logged in', async ({ page }) => {
     await page.goto('/');
-    await page.evaluate(() => localStorage.clear());
-    await page.reload();
+    await resetApp(page);
 
-    await page.click('#btn-profile');
+    await page.click('.nav-item[data-screen="profile"]');
     await expect(page.locator('#profile-name')).toHaveText('Guest');
     await expect(page.locator('#profile-email')).toHaveText('Not signed in');
     await expect(page.locator('#btn-login-from-profile')).toBeVisible();
@@ -71,10 +83,9 @@ test.describe('Smoke Tests', () => {
 
   test('login screen accessible from profile', async ({ page }) => {
     await page.goto('/');
-    await page.evaluate(() => localStorage.clear());
-    await page.reload();
+    await resetApp(page);
 
-    await page.click('#btn-profile');
+    await page.click('.nav-item[data-screen="profile"]');
     await page.click('#btn-login-from-profile');
     await expect(page.locator('#screen-login')).toHaveClass(/active/);
     await expect(page.locator('#btn-google-login')).toBeVisible();
@@ -83,13 +94,23 @@ test.describe('Smoke Tests', () => {
 
   test('groups screen accessible', async ({ page }) => {
     await page.goto('/');
-    await page.click('#btn-profile');
+    await page.evaluate(() => {
+      localStorage.setItem('whatnow_onboarding_complete', 'true');
+    });
+    await page.reload();
+    await page.waitForSelector('#screen-home.active', { timeout: 5000 });
+    await page.click('.nav-item[data-screen="profile"]');
     await page.click('#btn-view-groups');
     await expect(page.locator('#screen-groups')).toHaveClass(/active/);
   });
 
   test('import flow works', async ({ page }) => {
     await page.goto('/');
+    await page.evaluate(() => {
+      localStorage.setItem('whatnow_onboarding_complete', 'true');
+    });
+    await page.reload();
+    await page.waitForSelector('#screen-home.active', { timeout: 5000 });
     await page.click('#btn-add-task');
     await page.click('#btn-import');
     await expect(page.locator('#screen-import')).toHaveClass(/active/);
@@ -98,6 +119,11 @@ test.describe('Smoke Tests', () => {
 
   test('multi-add flow works', async ({ page }) => {
     await page.goto('/');
+    await page.evaluate(() => {
+      localStorage.setItem('whatnow_onboarding_complete', 'true');
+    });
+    await page.reload();
+    await page.waitForSelector('#screen-home.active', { timeout: 5000 });
     await page.click('#btn-add-task');
     await page.click('#btn-multi-add');
     await expect(page.locator('#screen-multi-type')).toHaveClass(/active/);
@@ -105,8 +131,7 @@ test.describe('Smoke Tests', () => {
 
   test('full task lifecycle with points', async ({ page }) => {
     await page.goto('/');
-    await page.evaluate(() => localStorage.clear());
-    await page.reload();
+    await resetApp(page);
 
     // Create task
     await page.click('#btn-add-task');
@@ -147,7 +172,7 @@ test.describe('Smoke Tests', () => {
     await expect(page.locator('.rank-title')).toHaveText('Task Newbie');
 
     // Check gallery has the task
-    await page.click('#btn-gallery');
+    await page.click('.nav-item[data-screen="gallery"]');
     await expect(page.locator('.gallery-item')).toHaveCount(1);
     await expect(page.locator('#gallery-total-tasks')).toHaveText('1');
     await expect(page.locator('#gallery-total-points')).toHaveText('15');

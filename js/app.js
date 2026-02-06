@@ -40,6 +40,10 @@ const App = {
     // Pending action (for resuming after login redirect)
     pendingAction: null,
 
+    // Cached notification count (invalidated when tasks change)
+    _notificationCache: null,
+    _notificationCacheTime: 0,
+
     // Initialize the app
     async init() {
         this.bindEvents();
@@ -167,16 +171,6 @@ const App = {
 
         document.getElementById('btn-manage-tasks').addEventListener('click', () => {
             this.showScreen('manage');
-        });
-
-        document.getElementById('btn-gallery').addEventListener('click', () => {
-            this.renderGallery();
-            this.showScreen('gallery');
-        });
-
-        document.getElementById('btn-profile').addEventListener('click', () => {
-            this.renderProfile();
-            this.showScreen('profile');
         });
 
         // Back buttons
@@ -715,20 +709,22 @@ const App = {
             </div>
         `).join('');
 
-        // Bind setup buttons
-        container.querySelectorAll('.pending-setup-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                this.openImportSetup(btn.dataset.id);
+        // Use event delegation on the container
+        if (!container._delegated) {
+            container._delegated = true;
+            container.addEventListener('click', (e) => {
+                const setupBtn = e.target.closest('.pending-setup-btn');
+                if (setupBtn) {
+                    this.openImportSetup(setupBtn.dataset.id);
+                    return;
+                }
+                const deleteBtn = e.target.closest('.pending-delete-btn');
+                if (deleteBtn) {
+                    Storage.removePendingImport(deleteBtn.dataset.id);
+                    this.renderPendingImports();
+                }
             });
-        });
-
-        // Bind delete buttons
-        container.querySelectorAll('.pending-delete-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                Storage.removePendingImport(btn.dataset.id);
-                this.renderPendingImports();
-            });
-        });
+        }
     },
 
     // Open import task setup
@@ -1001,24 +997,24 @@ const App = {
             </div>
         `).join('');
 
-        // Bind template item clicks
-        container.querySelectorAll('.template-item').forEach(item => {
-            item.addEventListener('click', (e) => {
-                if (!e.target.classList.contains('template-item-delete')) {
+        // Use event delegation on the container
+        if (!container._delegated) {
+            container._delegated = true;
+            container.addEventListener('click', (e) => {
+                const deleteBtn = e.target.closest('.template-item-delete');
+                if (deleteBtn) {
+                    e.stopPropagation();
+                    Storage.deleteTemplate(deleteBtn.dataset.id);
+                    this.renderTemplateList();
+                    this.updateTemplateButtonVisibility();
+                    return;
+                }
+                const item = e.target.closest('.template-item');
+                if (item) {
                     this.useTemplate(item.dataset.id);
                 }
             });
-        });
-
-        // Bind delete buttons
-        container.querySelectorAll('.template-item-delete').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                Storage.deleteTemplate(btn.dataset.id);
-                this.renderTemplateList();
-                this.updateTemplateButtonVisibility();
-            });
-        });
+        }
     },
 
     // Use a template to pre-fill task
@@ -1047,6 +1043,7 @@ const App = {
     saveNewTask() {
         const saveAsTemplate = document.getElementById('save-as-template').checked;
 
+        this._notificationCache = null; // Invalidate badge cache
         const savedTask = Storage.addTask(this.newTask);
 
         // Save as template if checked
@@ -1128,23 +1125,23 @@ const App = {
             `;
         }).join('');
 
-        // Bind task item clicks (for editing)
-        container.querySelectorAll('.task-item').forEach(item => {
-            item.addEventListener('click', (e) => {
-                if (!e.target.classList.contains('task-item-delete')) {
-                    this.openEditTask(item.dataset.id);
+        // Use event delegation on the container (no per-item listeners)
+        if (!container._delegated) {
+            container._delegated = true;
+            container.addEventListener('click', (e) => {
+                const deleteBtn = e.target.closest('.task-item-delete');
+                if (deleteBtn) {
+                    e.stopPropagation();
+                    Storage.deleteTask(deleteBtn.dataset.id);
+                    this.renderTaskList();
+                    return;
+                }
+                const taskItem = e.target.closest('.task-item');
+                if (taskItem) {
+                    this.openEditTask(taskItem.dataset.id);
                 }
             });
-        });
-
-        // Bind delete buttons
-        container.querySelectorAll('.task-item-delete').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                Storage.deleteTask(btn.dataset.id);
-                this.renderTaskList();
-            });
-        });
+        }
     },
 
     // Find matching tasks and show swipe screen
@@ -1159,8 +1156,10 @@ const App = {
             tasks = Storage.getFallbackTasks(energy, social, time);
         }
 
-        // Shuffle for variety
-        tasks = this.shuffleArray(tasks);
+        // Shuffle non-urgent tasks for variety, but keep urgent tasks at the front
+        const urgent = tasks.filter(t => Storage.getUrgencyScore(t) >= 2);
+        const nonUrgent = tasks.filter(t => Storage.getUrgencyScore(t) < 2);
+        tasks = [...urgent, ...this.shuffleArray(nonUrgent)];
 
         this.matchingTasks = tasks;
         this.currentCardIndex = 0;
@@ -1249,7 +1248,13 @@ const App = {
             if (!isDragging) return;
 
             const clientX = e.type === 'mousemove' ? e.clientX : e.touches[0].clientX;
+            const clientY = e.type === 'mousemove' ? e.clientY : e.touches[0].clientY;
             currentX = clientX - startX;
+
+            // Prevent page scroll when swiping horizontally
+            if (Math.abs(currentX) > Math.abs(clientY - startY) && e.cancelable) {
+                e.preventDefault();
+            }
 
             // Apply transform
             const rotation = currentX * 0.1;
@@ -1291,7 +1296,7 @@ const App = {
 
         // Touch events
         card.addEventListener('touchstart', onStart, { passive: true });
-        card.addEventListener('touchmove', onMove, { passive: true });
+        card.addEventListener('touchmove', onMove, { passive: false });
         card.addEventListener('touchend', onEnd);
 
         // Store cleanup function to remove document-level listeners
@@ -1358,10 +1363,23 @@ const App = {
     },
 
     // Utility: Escape HTML
+    _escapeEl: null,
     escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+        if (!this._escapeEl) this._escapeEl = document.createElement('div');
+        this._escapeEl.textContent = text;
+        return this._escapeEl.innerHTML;
+    },
+
+    // Utility: Sanitize URL for use in HTML attributes
+    sanitizeUrl(url) {
+        if (!url) return '';
+        try {
+            const parsed = new URL(url);
+            if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+                return this.escapeHtml(url);
+            }
+        } catch (e) { /* invalid URL */ }
+        return '';
     },
 
     // Timer functions
@@ -1444,9 +1462,11 @@ const App = {
 
         // Track time if timer was used
         let minutesSpent = null;
-        if (fromTimer && this.timerSeconds > 0) {
-            minutesSpent = Math.ceil(this.timerSeconds / 60);
-            Storage.addTimeSpent(minutesSpent);
+        if (this.timerInterval) {
+            if (this.timerSeconds > 0) {
+                minutesSpent = Math.ceil(this.timerSeconds / 60);
+                Storage.addTimeSpent(minutesSpent);
+            }
             this.cancelTimer();
         }
 
@@ -1502,8 +1522,11 @@ const App = {
         const particles = [];
         const colors = ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#ec4899'];
 
+        // Reduce particles on smaller/lower-end devices
+        const particleCount = canvas.width < 400 ? 50 : 80;
+
         // Create particles
-        for (let i = 0; i < 100; i++) {
+        for (let i = 0; i < particleCount; i++) {
             particles.push({
                 x: Math.random() * canvas.width,
                 y: Math.random() * canvas.height - canvas.height,
@@ -1792,8 +1815,9 @@ const App = {
 
             const avatarEl = document.getElementById('profile-avatar');
             const avatarUrl = this.user.user_metadata?.avatar_url || this.user.user_metadata?.picture;
-            if (avatarUrl) {
-                avatarEl.innerHTML = `<img src="${avatarUrl}" alt="Avatar">`;
+            const safeAvatarUrl = this.sanitizeUrl(avatarUrl);
+            if (safeAvatarUrl) {
+                avatarEl.innerHTML = `<img src="${safeAvatarUrl}" alt="Avatar">`;
             } else {
                 avatarEl.innerHTML = '<span class="avatar-placeholder">' +
                     (displayName[0] || '?').toUpperCase() + '</span>';
@@ -1831,7 +1855,7 @@ const App = {
             }
         }
 
-        if (!this.pendingAction || !this.isLoggedIn) return;
+        if (!this.pendingAction || !this.isLoggedIn) return false;
 
         const action = this.pendingAction;
         this.pendingAction = null;
@@ -2046,9 +2070,15 @@ const App = {
                 current_rank: Storage.getRank(stats.totalPoints).name
             });
 
-            // Sync completed tasks
+            // Sync only new completed tasks (not yet synced)
             const completed = Storage.getCompletedTasks();
-            for (const task of completed.slice(-50)) {
+            const lastSyncedId = localStorage.getItem('whatnow_last_synced_completed') || '';
+            const lastSyncedIndex = lastSyncedId
+                ? completed.findIndex(t => t.id === lastSyncedId)
+                : -1;
+            const unsynced = completed.slice(lastSyncedIndex + 1);
+
+            for (const task of unsynced) {
                 await DB.logCompleted(
                     this.user.id,
                     task.name,
@@ -2056,6 +2086,10 @@ const App = {
                     task.points,
                     task.timeSpent
                 );
+            }
+
+            if (completed.length > 0) {
+                localStorage.setItem('whatnow_last_synced_completed', completed[completed.length - 1].id);
             }
 
             console.log('[Sync] Data synced to cloud');
@@ -2203,8 +2237,8 @@ const App = {
                     <div class="leaderboard-item${isMe ? ' is-me' : ''}">
                         <div class="leaderboard-position">${index + 1}</div>
                         <div class="leaderboard-avatar">
-                            ${entry.avatar_url
-                                ? `<img src="${entry.avatar_url}" alt="">`
+                            ${this.sanitizeUrl(entry.avatar_url)
+                                ? `<img src="${this.sanitizeUrl(entry.avatar_url)}" alt="">`
                                 : `<span>${initial}</span>`}
                         </div>
                         <div class="leaderboard-info">
@@ -2383,9 +2417,15 @@ const App = {
         return notifications;
     },
 
-    // Update notification badge count
+    // Update notification badge count (uses cache, refreshes every 30s)
     updateNotificationBadge() {
+        const now = Date.now();
+        if (this._notificationCache !== null && (now - this._notificationCacheTime) < 30000) {
+            return; // Use cached badge, don't recalculate
+        }
+        this._notificationCacheTime = now;
         const notifications = this.getNotifications();
+        this._notificationCache = notifications.length;
         const badge = document.getElementById('floating-bell-badge');
         const urgentCount = notifications.filter(n => n.priority >= 2).length;
 
@@ -2425,15 +2465,16 @@ const App = {
             </div>
         `).join('');
 
-        // Click to go to edit task
-        container.querySelectorAll('.notification-item').forEach(item => {
-            item.addEventListener('click', () => {
-                const taskId = item.dataset.taskId;
-                if (taskId) {
-                    this.openEditTask(taskId);
+        // Use event delegation for notification clicks
+        if (!container._delegated) {
+            container._delegated = true;
+            container.addEventListener('click', (e) => {
+                const item = e.target.closest('.notification-item');
+                if (item && item.dataset.taskId) {
+                    this.openEditTask(item.dataset.taskId);
                 }
             });
-        });
+        }
     },
 
     // ==================== NOTIFICATION HANDLING ====================

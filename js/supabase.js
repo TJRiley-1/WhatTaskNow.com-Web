@@ -228,7 +228,7 @@ const Supabase = {
     },
 
     // Database: Query helper
-    async from(table) {
+    from(table) {
         return new SupabaseQuery(this, table);
     }
 };
@@ -270,6 +270,11 @@ class SupabaseQuery {
         return this;
     }
 
+    in(column, values) {
+        this.queryParams.push(`${column}=in.(${values.map(v => `"${v}"`).join(',')})`);
+        return this;
+    }
+
     order(column, { ascending = true } = {}) {
         this.orderColumn = column;
         this.orderAsc = ascending;
@@ -307,11 +312,6 @@ class SupabaseQuery {
         } catch (e) {
             return { data: null, error: e };
         }
-    }
-
-    // Shorthand for execute
-    async then(resolve) {
-        resolve(await this.execute());
     }
 
     // Insert
@@ -403,7 +403,7 @@ const DB = {
         });
     },
 
-    // Sync tasks to cloud
+    // Sync tasks to cloud (batch upsert)
     async syncTasks(userId, tasks) {
         const cloudTasks = tasks.map(task => ({
             user_id: userId,
@@ -422,10 +422,10 @@ const DB = {
             points_earned: task.pointsEarned || 0
         }));
 
-        // Upsert all tasks
-        for (const task of cloudTasks) {
+        // Batch upsert all tasks in a single request
+        if (cloudTasks.length > 0) {
             const query = new SupabaseQuery(Supabase, 'tasks');
-            await query.upsert(task);
+            await query.upsert(cloudTasks);
         }
     },
 
@@ -447,23 +447,32 @@ const DB = {
         });
     },
 
-    // Get groups for user
+    // Get groups for user (uses select with embedding to avoid N+1)
     async getMyGroups(userId) {
-        const query = new SupabaseQuery(Supabase, 'group_members');
-        const { data: memberships, error } = await query.eq('user_id', userId).execute();
+        try {
+            // Get memberships with group data in a single query using PostgREST embedding
+            const data = await Supabase.request(
+                `/rest/v1/group_members?select=group_id,groups(*)&user_id=eq.${userId}`
+            );
+            const groups = (data || [])
+                .map(m => m.groups)
+                .filter(Boolean);
+            return { data: groups, error: null };
+        } catch (e) {
+            // Fallback to sequential queries if embedding fails
+            const query = new SupabaseQuery(Supabase, 'group_members');
+            const { data: memberships, error } = await query.eq('user_id', userId).execute();
 
-        if (error || !memberships?.length) return { data: [], error };
+            if (error || !memberships?.length) return { data: [], error };
 
-        const groupIds = memberships.map(m => m.group_id);
-        const groups = [];
-
-        for (const groupId of groupIds) {
-            const groupQuery = new SupabaseQuery(Supabase, 'groups');
-            const { data } = await groupQuery.eq('id', groupId).execute();
-            if (data?.[0]) groups.push(data[0]);
+            const groups = [];
+            for (const m of memberships) {
+                const gq = new SupabaseQuery(Supabase, 'groups');
+                const { data } = await gq.eq('id', m.group_id).execute();
+                if (data?.[0]) groups.push(data[0]);
+            }
+            return { data: groups, error: null };
         }
-
-        return { data: groups, error: null };
     },
 
     // Create group
@@ -517,34 +526,51 @@ const DB = {
 
         if (memberError || !members?.length) return { data: [], error: memberError };
 
-        // Get profiles and weekly stats for each member
-        const leaderboard = [];
+        const userIds = members.map(m => m.user_id);
         const weekAgo = new Date();
         weekAgo.setDate(weekAgo.getDate() - 7);
 
-        for (const member of members) {
-            // Get profile
-            const { data: profiles } = await DB.getProfile(member.user_id);
-            const profile = profiles?.[0];
+        // Batch: fetch all profiles and weekly completed tasks in 2 queries instead of 2N
+        const profileQuery = new SupabaseQuery(Supabase, 'profiles');
+        const completedQuery = new SupabaseQuery(Supabase, 'completed_tasks');
+
+        const [profileResult, completedResult] = await Promise.all([
+            profileQuery.in('id', userIds).execute(),
+            completedQuery.in('user_id', userIds).gte('completed_at', weekAgo.toISOString()).execute()
+        ]);
+
+        const profiles = profileResult.data || [];
+        const completedTasks = completedResult.data || [];
+
+        // Index profiles by user_id
+        const profileMap = {};
+        for (const p of profiles) {
+            profileMap[p.id] = p;
+        }
+
+        // Aggregate completed tasks per user
+        const statsMap = {};
+        for (const c of completedTasks) {
+            if (!statsMap[c.user_id]) {
+                statsMap[c.user_id] = { points: 0, tasks: 0 };
+            }
+            statsMap[c.user_id].points += c.points;
+            statsMap[c.user_id].tasks++;
+        }
+
+        const leaderboard = [];
+        for (const userId of userIds) {
+            const profile = profileMap[userId];
             if (!profile) continue;
 
-            // Get weekly completed tasks
-            const completedQuery = new SupabaseQuery(Supabase, 'completed_tasks');
-            const { data: completed } = await completedQuery
-                .eq('user_id', member.user_id)
-                .gte('completed_at', weekAgo.toISOString())
-                .execute();
-
-            const weeklyPoints = completed?.reduce((sum, c) => sum + c.points, 0) || 0;
-            const weeklyTasks = completed?.length || 0;
-
+            const userStats = statsMap[userId] || { points: 0, tasks: 0 };
             leaderboard.push({
-                user_id: member.user_id,
+                user_id: userId,
                 display_name: profile.display_name,
                 avatar_url: profile.avatar_url,
                 current_rank: profile.current_rank,
-                weekly_points: weeklyPoints,
-                weekly_tasks: weeklyTasks
+                weekly_points: userStats.points,
+                weekly_tasks: userStats.tasks
             });
         }
 

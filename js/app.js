@@ -2269,6 +2269,18 @@ const App = {
         if (typeof group === 'string') {
             group = { id: group, invite_code: arguments[1] };
         }
+
+        // Ensure we have full group data (including created_by)
+        if (!group.created_by) {
+            try {
+                const query = new SupabaseQuery(Supabase, 'groups');
+                const { data } = await query.eq('id', group.id).execute();
+                if (data?.[0]) {
+                    group = { ...group, ...data[0] };
+                }
+            } catch (e) { /* continue with partial data */ }
+        }
+
         this.currentGroup = group;
 
         document.getElementById('group-invite-code').textContent = group.invite_code;

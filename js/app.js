@@ -299,13 +299,16 @@ const App = {
                 const type = btn.dataset.type;
                 const value = btn.dataset.value;
 
-                // Update state
-                this.currentState[type] = type === 'time' ? parseInt(value) : value;
-
-                // Update button styles
-                const row = btn.parentElement;
-                row.querySelectorAll('.state-btn').forEach(b => b.classList.remove('selected'));
-                btn.classList.add('selected');
+                // Toggle: if already selected, deselect
+                if (btn.classList.contains('selected')) {
+                    btn.classList.remove('selected');
+                    this.currentState[type] = null;
+                } else {
+                    this.currentState[type] = type === 'time' ? parseInt(value) : value;
+                    const row = btn.parentElement;
+                    row.querySelectorAll('.state-btn').forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                }
 
                 // Enable find button if all selected
                 this.updateFindButtonState();

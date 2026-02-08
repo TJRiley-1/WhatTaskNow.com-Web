@@ -2,7 +2,7 @@
 
 -- 1. UPDATE policy for groups (allows creators to edit group name/description)
 CREATE POLICY "Group creators can update their groups" ON groups
-  FOR UPDATE TO authenticated USING (auth.uid() = created_by);
+  FOR UPDATE TO authenticated USING ((select auth.uid()) = created_by);
 
 -- 2. Group challenges table
 CREATE TABLE group_challenges (
@@ -24,14 +24,8 @@ CREATE POLICY "Members can view group challenges" ON group_challenges
 
 CREATE POLICY "Creators can manage challenges" ON group_challenges
   FOR INSERT TO authenticated WITH CHECK (
-    is_group_member(group_id) AND created_by = auth.uid()
+    is_group_member(group_id) AND created_by = (select auth.uid())
   );
 
 CREATE POLICY "Creators can delete challenges" ON group_challenges
-  FOR DELETE TO authenticated USING (created_by = auth.uid());
-
--- 3. DELETE policy for group_members (allows group creators to remove members)
-CREATE POLICY "Group creators can remove members" ON group_members
-  FOR DELETE TO authenticated USING (
-    group_id IN (SELECT id FROM groups WHERE created_by = auth.uid())
-  );
+  FOR DELETE TO authenticated USING (created_by = (select auth.uid()));

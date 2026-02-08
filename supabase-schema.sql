@@ -85,6 +85,8 @@ left join public.completed_tasks ct on ct.user_id = p.id
 left join public.group_members gm on gm.user_id = p.id
 group by p.id, p.display_name, p.avatar_url, p.current_rank, gm.group_id;
 
+alter view public.weekly_leaderboard set (security_invoker = on);
+
 -- Row Level Security (RLS) Policies
 
 -- Enable RLS on all tables
@@ -94,65 +96,65 @@ alter table public.completed_tasks enable row level security;
 alter table public.groups enable row level security;
 alter table public.group_members enable row level security;
 
--- Profiles: users can read/update their own profile
-create policy "Users can view own profile" on public.profiles
-  for select using (auth.uid() = id);
-
-create policy "Users can update own profile" on public.profiles
-  for update using (auth.uid() = id);
-
-create policy "Users can insert own profile" on public.profiles
-  for insert with check (auth.uid() = id);
-
--- Profiles: group members can see each other's basic info (for leaderboard)
-create policy "Group members can view each other" on public.profiles
+-- Profiles: users can view own profile or group members' profiles
+create policy "Users can view profiles" on public.profiles
   for select using (
-    id in (
+    (select auth.uid()) = id
+    or id in (
       select gm2.user_id from public.group_members gm1
       join public.group_members gm2 on gm1.group_id = gm2.group_id
-      where gm1.user_id = auth.uid()
+      where gm1.user_id = (select auth.uid())
     )
   );
 
+create policy "Users can update own profile" on public.profiles
+  for update using ((select auth.uid()) = id);
+
+create policy "Users can insert own profile" on public.profiles
+  for insert with check ((select auth.uid()) = id);
+
 -- Tasks: users can only access their own tasks
 create policy "Users can view own tasks" on public.tasks
-  for select using (auth.uid() = user_id);
+  for select using ((select auth.uid()) = user_id);
 
 create policy "Users can insert own tasks" on public.tasks
-  for insert with check (auth.uid() = user_id);
+  for insert with check ((select auth.uid()) = user_id);
 
 create policy "Users can update own tasks" on public.tasks
-  for update using (auth.uid() = user_id);
+  for update using ((select auth.uid()) = user_id);
 
 create policy "Users can delete own tasks" on public.tasks
-  for delete using (auth.uid() = user_id);
+  for delete using ((select auth.uid()) = user_id);
 
 -- Completed tasks: users can only access their own
 create policy "Users can view own completed" on public.completed_tasks
-  for select using (auth.uid() = user_id);
+  for select using ((select auth.uid()) = user_id);
 
 create policy "Users can insert own completed" on public.completed_tasks
-  for insert with check (auth.uid() = user_id);
+  for insert with check ((select auth.uid()) = user_id);
 
 -- Groups: anyone can view groups (to join via code)
 create policy "Anyone can view groups" on public.groups
   for select using (true);
 
 create policy "Authenticated users can create groups" on public.groups
-  for insert with check (auth.uid() = created_by);
+  for insert with check ((select auth.uid()) = created_by);
 
 -- Group members: members can see their groups
 create policy "Members can view group membership" on public.group_members
   for select using (
-    auth.uid() = user_id or
-    group_id in (select group_id from public.group_members where user_id = auth.uid())
+    (select auth.uid()) = user_id or
+    group_id in (select group_id from public.group_members where user_id = (select auth.uid()))
   );
 
 create policy "Users can join groups" on public.group_members
-  for insert with check (auth.uid() = user_id);
+  for insert with check ((select auth.uid()) = user_id);
 
-create policy "Users can leave groups" on public.group_members
-  for delete using (auth.uid() = user_id);
+create policy "Users can leave or creators can remove" on public.group_members
+  for delete to authenticated using (
+    (select auth.uid()) = user_id
+    or group_id in (select id from public.groups where created_by = (select auth.uid()))
+  );
 
 -- Function to create profile on signup
 create or replace function public.handle_new_user()
@@ -167,7 +169,7 @@ begin
   );
   return new;
 end;
-$$ language plpgsql security definer;
+$$ language plpgsql security definer set search_path = '';
 
 -- Trigger to auto-create profile
 create or replace trigger on_auth_user_created
@@ -180,4 +182,13 @@ returns text as $$
 begin
   return upper(substr(md5(random()::text), 1, 6));
 end;
-$$ language plpgsql;
+$$ language plpgsql set search_path = '';
+
+-- Function to check group membership (used by group_challenges RLS)
+create or replace function public.is_group_member(_group_id uuid)
+returns boolean as $$
+  select exists (
+    select 1 from public.group_members
+    where group_id = _group_id and user_id = auth.uid()
+  );
+$$ language sql security definer set search_path = '';

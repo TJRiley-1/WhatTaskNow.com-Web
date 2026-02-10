@@ -1252,8 +1252,8 @@
                     .then((reg) => {
                         console.log('SW registered');
 
-                        // Check for updates every 60 seconds
-                        setInterval(() => reg.update(), 60 * 1000);
+                        // Check for updates every 5 minutes
+                        setInterval(() => reg.update(), 5 * 60 * 1000);
 
                         // When a new SW is waiting, activate it and reload
                         reg.addEventListener('updatefound', () => {

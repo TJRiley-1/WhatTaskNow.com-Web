@@ -866,6 +866,7 @@ const App = {
                 this.editingTask.desc = document.getElementById('edit-task-desc').value.trim();
                 this.editingTask.dueDate = document.getElementById('edit-task-due-date').value || null;
                 Storage.updateTask(this.editingTask.id, this.editingTask);
+                this._notificationCache = null;
                 this.showScreen('manage');
             }
         });
@@ -874,6 +875,7 @@ const App = {
         document.getElementById('btn-delete-task').addEventListener('click', () => {
             if (confirm('Delete this task?')) {
                 Storage.deleteTask(this.editingTask.id);
+                this._notificationCache = null;
                 this.showScreen('manage');
             }
         });
@@ -1147,6 +1149,7 @@ const App = {
                 if (deleteBtn) {
                     e.stopPropagation();
                     Storage.deleteTask(deleteBtn.dataset.id);
+                    this._notificationCache = null;
                     this.renderTaskList();
                     return;
                 }
@@ -1313,10 +1316,12 @@ const App = {
         card.addEventListener('touchmove', onMove, { passive: false });
         card.addEventListener('touchend', onEnd);
 
-        // Store cleanup function to remove document-level listeners
+        // Store cleanup function to remove all swipe listeners
         this.swipeCleanup = () => {
             document.removeEventListener('mousemove', onMove);
             document.removeEventListener('mouseup', onEnd);
+            card.removeEventListener('mousedown', onStart);
+            card.removeEventListener('touchstart', onStart);
             card.removeEventListener('touchmove', onMove);
             card.removeEventListener('touchend', onEnd);
         };
@@ -1325,6 +1330,7 @@ const App = {
     // Animate card off screen
     animateCardOut(card, direction) {
         const task = this.matchingTasks[this.currentCardIndex];
+        if (!task) return;
         const translateX = direction === 'left' ? -500 : 500;
         const rotation = direction === 'left' ? -30 : 30;
 
@@ -1408,14 +1414,20 @@ const App = {
             if (this.timerRunning) {
                 this.timerSeconds++;
                 this.updateTimerDisplay();
+                // Persist elapsed time for page refresh recovery
+                const timerState = sessionStorage.getItem('whatnow_timer');
+                if (timerState) {
+                    const state = JSON.parse(timerState);
+                    state.seconds = this.timerSeconds;
+                    sessionStorage.setItem('whatnow_timer', JSON.stringify(state));
+                }
             }
         }, 1000);
 
         // Save timer state to sessionStorage
         sessionStorage.setItem('whatnow_timer', JSON.stringify({
             taskId: this.acceptedTask.id,
-            startTime: Date.now(),
-            seconds: 0
+            startTime: Date.now()
         }));
 
         this.showScreen('timer');
@@ -1445,7 +1457,8 @@ const App = {
 
     // Complete task with celebration
     completeTask(fromTimer) {
-        if (!this.acceptedTask) return;
+        if (!this.acceptedTask || this._completing) return;
+        this._completing = true;
 
         // Store previous rank for level-up check
         const stats = Storage.getStats();
@@ -1488,6 +1501,7 @@ const App = {
         Storage.addCompletedTask(this.acceptedTask, points, minutesSpent);
 
         // Show celebration
+        this._completing = false;
         this.showCelebration();
     },
 
@@ -1526,6 +1540,12 @@ const App = {
     },
 
     startConfetti() {
+        // Cancel any previous confetti animation
+        if (this._confettiId) {
+            cancelAnimationFrame(this._confettiId);
+            this._confettiId = null;
+        }
+
         const canvas = document.getElementById('confetti-canvas');
         const ctx = canvas.getContext('2d');
 
@@ -1579,10 +1599,10 @@ const App = {
             });
 
             frameCount++;
-            requestAnimationFrame(animate);
+            this._confettiId = requestAnimationFrame(animate);
         };
 
-        animate();
+        this._confettiId = requestAnimationFrame(animate);
     },
 
     // Render gallery screen
@@ -1957,6 +1977,12 @@ const App = {
             return;
         }
 
+        if (!email.includes('@') || !email.includes('.')) {
+            errorEl.textContent = 'Please enter a valid email address';
+            errorEl.classList.remove('hidden');
+            return;
+        }
+
         try {
             errorEl.classList.add('hidden');
             await Supabase.signIn(email, password);
@@ -2020,6 +2046,12 @@ const App = {
 
         if (!email || !password) {
             errorEl.textContent = 'Please enter email and password';
+            errorEl.classList.remove('hidden');
+            return;
+        }
+
+        if (!email.includes('@') || !email.includes('.')) {
+            errorEl.textContent = 'Please enter a valid email address';
             errorEl.classList.remove('hidden');
             return;
         }
@@ -2108,9 +2140,10 @@ const App = {
 
     // Auto-sync local data to cloud (called after login, no alerts)
     async autoSyncToCloud() {
-        if (!this.isLoggedIn || !this.user) {
+        if (!this.isLoggedIn || !this.user || this._syncing) {
             return;
         }
+        this._syncing = true;
 
         try {
             // Sync tasks
@@ -2153,6 +2186,8 @@ const App = {
             console.log('[Sync] Data synced to cloud');
         } catch (e) {
             console.error('[Sync] Auto-sync error:', e);
+        } finally {
+            this._syncing = false;
         }
     },
 

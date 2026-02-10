@@ -44,8 +44,8 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
         fetch(event.request)
             .then((response) => {
-                // Only cache successful same-origin responses
-                if (response.ok) {
+                // Only cache successful same-origin responses for known assets
+                if (response.ok && ASSETS.includes(url.pathname)) {
                     const clone = response.clone();
                     caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
                 }

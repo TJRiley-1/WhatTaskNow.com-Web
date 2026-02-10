@@ -172,11 +172,12 @@ const Supabase = {
             const expires_in = params.get('expires_in');
 
             if (access_token) {
+                const expiresIn = parseInt(expires_in) || 3600;
                 await this.setSession({
                     access_token,
                     refresh_token,
-                    expires_in: parseInt(expires_in),
-                    expires_at: Date.now() + (parseInt(expires_in) * 1000)
+                    expires_in: expiresIn,
+                    expires_at: Date.now() + (expiresIn * 1000)
                 });
 
                 // Clear the hash
@@ -279,22 +280,22 @@ class SupabaseQuery {
     }
 
     eq(column, value) {
-        this.queryParams.push(`${column}=eq.${value}`);
+        this.queryParams.push(`${encodeURIComponent(column)}=eq.${encodeURIComponent(value)}`);
         return this;
     }
 
     gt(column, value) {
-        this.queryParams.push(`${column}=gt.${value}`);
+        this.queryParams.push(`${encodeURIComponent(column)}=gt.${encodeURIComponent(value)}`);
         return this;
     }
 
     gte(column, value) {
-        this.queryParams.push(`${column}=gte.${value}`);
+        this.queryParams.push(`${encodeURIComponent(column)}=gte.${encodeURIComponent(value)}`);
         return this;
     }
 
     lt(column, value) {
-        this.queryParams.push(`${column}=lt.${value}`);
+        this.queryParams.push(`${encodeURIComponent(column)}=lt.${encodeURIComponent(value)}`);
         return this;
     }
 

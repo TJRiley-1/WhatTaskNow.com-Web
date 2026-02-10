@@ -635,18 +635,28 @@ const NotificationManager = {
         }
     },
 
+    // Active timeout IDs for cancellation
+    _timeoutIds: {},
+
     // Schedule a notification for a specific time
     scheduleNotification(id, time, title, options) {
         const scheduled = this.getScheduledNotifications();
         scheduled[id] = { time: time.getTime(), title, options };
         localStorage.setItem(this.KEYS.SCHEDULED, JSON.stringify(scheduled));
 
+        // Cancel any existing timeout for this id
+        if (this._timeoutIds[id]) {
+            clearTimeout(this._timeoutIds[id]);
+            delete this._timeoutIds[id];
+        }
+
         // Set timeout if notification is within the next 24 hours
         const delay = time.getTime() - Date.now();
         if (delay > 0 && delay < 24 * 60 * 60 * 1000) {
-            setTimeout(() => {
+            this._timeoutIds[id] = setTimeout(() => {
                 this.show(title, options);
                 this.removeScheduledNotification(id);
+                delete this._timeoutIds[id];
             }, delay);
         }
     },
@@ -659,6 +669,10 @@ const NotificationManager = {
 
     // Remove a scheduled notification
     removeScheduledNotification(id) {
+        if (this._timeoutIds[id]) {
+            clearTimeout(this._timeoutIds[id]);
+            delete this._timeoutIds[id];
+        }
         const scheduled = this.getScheduledNotifications();
         delete scheduled[id];
         localStorage.setItem(this.KEYS.SCHEDULED, JSON.stringify(scheduled));
@@ -677,7 +691,7 @@ const NotificationManager = {
                 this.removeScheduledNotification(id);
             } else if (delay < 24 * 60 * 60 * 1000) {
                 // Within 24 hours, schedule
-                setTimeout(() => {
+                this._timeoutIds[id] = setTimeout(() => {
                     this.show(data.title, data.options);
                     this.removeScheduledNotification(id);
                 }, delay);

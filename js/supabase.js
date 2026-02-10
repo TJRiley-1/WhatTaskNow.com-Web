@@ -37,8 +37,27 @@ const Supabase = {
         return this.user;
     },
 
+    // Check if the current token is expired (with 30s buffer)
+    isTokenExpired() {
+        if (!this.session?.expires_at) return false;
+        return Date.now() > this.session.expires_at - 30000;
+    },
+
+    // Ensure we have a valid token before making API calls
+    async ensureValidToken() {
+        if (this.session?.access_token && this.isTokenExpired()) {
+            await this.refreshSession();
+        }
+    },
+
     // API request helper
-    async request(endpoint, options = {}) {
+    async request(endpoint, options = {}, _retried = false) {
+        // Auto-refresh expired tokens before non-auth API calls
+        const isAuthEndpoint = endpoint.startsWith('/auth/');
+        if (!isAuthEndpoint) {
+            await this.ensureValidToken();
+        }
+
         const url = `${this.url}${endpoint}`;
         const headers = {
             'apikey': this.key,
@@ -54,6 +73,14 @@ const Supabase = {
             ...options,
             headers
         });
+
+        // Retry once on 401/403 by refreshing the token
+        if (!_retried && !isAuthEndpoint && (response.status === 401 || response.status === 403)) {
+            const refreshed = await this.refreshSession();
+            if (refreshed) {
+                return this.request(endpoint, options, true);
+            }
+        }
 
         if (!response.ok) {
             const error = await response.json().catch(() => ({ message: response.statusText }));

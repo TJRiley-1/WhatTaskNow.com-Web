@@ -1822,20 +1822,34 @@ const App = {
             this.user = Supabase.user;
             const { data, error } = await DB.getProfile(this.user.id);
 
+            if (error) {
+                // Don't try to create a profile if the GET itself failed
+                console.error('Error loading profile:', error.message);
+                return;
+            }
+
             if (data && data[0]) {
                 this.profile = data[0];
             } else {
-                // Profile doesn't exist, create one using Google metadata
-                const displayName = this.user.user_metadata?.full_name ||
-                                   this.user.user_metadata?.name ||
-                                   this.user.email?.split('@')[0] || 'User';
-                const avatarUrl = this.user.user_metadata?.avatar_url ||
-                                 this.user.user_metadata?.picture || null;
+                // Profile not found — trigger may still be creating it, wait briefly and retry
+                await new Promise(r => setTimeout(r, 1000));
+                const { data: retryData } = await DB.getProfile(this.user.id);
 
-                await DB.createProfile(this.user.id, this.user.email, displayName, avatarUrl);
-                const { data: newData } = await DB.getProfile(this.user.id);
-                if (newData && newData[0]) {
-                    this.profile = newData[0];
+                if (retryData && retryData[0]) {
+                    this.profile = retryData[0];
+                } else {
+                    // Profile genuinely doesn't exist, create one using metadata
+                    const displayName = this.user.user_metadata?.full_name ||
+                                       this.user.user_metadata?.name ||
+                                       this.user.email?.split('@')[0] || 'User';
+                    const avatarUrl = this.user.user_metadata?.avatar_url ||
+                                     this.user.user_metadata?.picture || null;
+
+                    await DB.createProfile(this.user.id, this.user.email, displayName, avatarUrl);
+                    const { data: newData } = await DB.getProfile(this.user.id);
+                    if (newData && newData[0]) {
+                        this.profile = newData[0];
+                    }
                 }
             }
 

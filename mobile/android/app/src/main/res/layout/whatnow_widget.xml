@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="@android:color/black">
+
+    <TextView
+        android:id="@+id/widget_task_name"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="@android:color/white"
+        android:textSize="14sp"
+        android:text="No task available" />
+
+    <TextView
+        android:id="@+id/widget_open_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="#6366F1"
+        android:textSize="12sp"
+        android:text="Open What Now?" />
+
+</LinearLayout>

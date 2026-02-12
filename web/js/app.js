@@ -1540,17 +1540,25 @@ const App = {
 
         // Update task stats
         if (!this.acceptedTask.isFallback) {
-            const updates = {
-                timesCompleted: (this.acceptedTask.timesCompleted || 0) + 1,
-                pointsEarned: (this.acceptedTask.pointsEarned || 0) + points
-            };
-
-            // Handle recurring tasks - set next due date
             if (this.acceptedTask.recurring && this.acceptedTask.recurring !== 'none') {
-                updates.dueDate = Storage.getNextDueDate(this.acceptedTask);
+                // Recurring tasks: advance due date and keep in list
+                const updates = {
+                    timesCompleted: (this.acceptedTask.timesCompleted || 0) + 1,
+                    pointsEarned: (this.acceptedTask.pointsEarned || 0) + points,
+                    dueDate: Storage.getNextDueDate(this.acceptedTask)
+                };
+                Storage.updateTask(this.acceptedTask.id, updates);
+            } else if (this.acceptedTask.dueDate) {
+                // Non-recurring tasks with a due date: remove from task list
+                Storage.deleteTask(this.acceptedTask.id);
+            } else {
+                // Non-recurring tasks without a due date: keep in list (reusable)
+                const updates = {
+                    timesCompleted: (this.acceptedTask.timesCompleted || 0) + 1,
+                    pointsEarned: (this.acceptedTask.pointsEarned || 0) + points
+                };
+                Storage.updateTask(this.acceptedTask.id, updates);
             }
-
-            Storage.updateTask(this.acceptedTask.id, updates);
         }
 
         // Update global stats

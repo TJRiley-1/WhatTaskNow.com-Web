@@ -309,3 +309,69 @@ test.describe('Issue 7: Notification click starts task', () => {
     await expect(page.locator('#btn-done')).toBeVisible();
   });
 });
+
+// ─── Issue 9: Non-recurring due-date task removed after completion ───
+
+test.describe('Issue 9: Non-recurring task with due date removed on completion', () => {
+  test('completing a non-recurring task with due date removes it from task list', async ({ page }) => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dateStr = tomorrow.toISOString().split('T')[0];
+
+    await createTask(page, { name: 'One-time Due Task', dueDate: dateStr, recurring: 'None' });
+
+    // Verify task exists in manage
+    await page.click('#btn-manage-tasks');
+    await expect(page.locator('.task-item')).toHaveCount(1);
+    await page.click('#screen-manage .btn-back');
+
+    // Start from calendar and complete
+    await page.click('.nav-item[data-screen="calendar"]');
+    await page.click('.calendar-item .task-start-btn');
+    await expect(page.locator('#screen-accepted')).toHaveClass(/active/);
+    await page.click('#btn-done');
+    await expect(page.locator('#screen-celebration')).toHaveClass(/active/);
+    await page.click('#btn-celebration-done');
+
+    // Task should be gone from manage tasks
+    await page.click('#btn-manage-tasks');
+    await expect(page.locator('#no-tasks-yet')).not.toHaveClass(/hidden/);
+
+    // But should appear in completed history
+    const completed = await page.evaluate(() =>
+      JSON.parse(localStorage.getItem('whatnow_completed') || '[]')
+    );
+    expect(completed.length).toBe(1);
+    expect(completed[0].name).toBe('One-time Due Task');
+  });
+
+  test('completing a non-recurring task WITHOUT due date keeps it in task list', async ({ page }) => {
+    await createTask(page, { name: 'Reusable Task' });
+
+    await acceptTask(page);
+    await page.click('#btn-done');
+    await page.click('#btn-celebration-done');
+
+    // Task should still be in manage tasks (reusable)
+    await page.click('#btn-manage-tasks');
+    await expect(page.locator('.task-item')).toHaveCount(1);
+    await expect(page.locator('.task-item-name')).toHaveText('Reusable Task');
+  });
+
+  test('completing a recurring task with due date keeps it and advances date', async ({ page }) => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dateStr = tomorrow.toISOString().split('T')[0];
+
+    await createTask(page, { name: 'Weekly Task', dueDate: dateStr, recurring: 'Weekly' });
+
+    await acceptTask(page);
+    await page.click('#btn-done');
+    await page.click('#btn-celebration-done');
+
+    // Task should still be in manage tasks with advanced date
+    await page.click('#btn-manage-tasks');
+    await expect(page.locator('.task-item')).toHaveCount(1);
+    await expect(page.locator('.task-item-name')).toHaveText('Weekly Task');
+  });
+});

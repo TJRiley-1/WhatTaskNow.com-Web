@@ -415,9 +415,11 @@ class SupabaseQuery {
     }
 
     // Upsert
-    async upsert(data) {
+    async upsert(data, { onConflict } = {}) {
         try {
-            const result = await this.client.request(`/rest/v1/${this.table}`, {
+            let url = `/rest/v1/${this.table}`;
+            if (onConflict) url += `?on_conflict=${onConflict}`;
+            const result = await this.client.request(url, {
                 method: 'POST',
                 headers: {
                     'Prefer': 'return=representation,resolution=merge-duplicates'
@@ -507,7 +509,7 @@ const DB = {
             times_skipped: task.timesSkipped || 0,
             times_completed: task.timesCompleted || 0,
             points_earned: task.pointsEarned || 0
-        });
+        }, { onConflict: 'user_id,local_id' });
         if (error) throw error;
     },
 

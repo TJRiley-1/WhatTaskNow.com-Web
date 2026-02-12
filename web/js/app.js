@@ -2436,13 +2436,18 @@ const App = {
         try {
             // Sync tasks individually (batch upsert can 409 on conflicts)
             const tasks = Storage.getTasks();
+            console.log('[Sync] Syncing', tasks.length, 'tasks for user', this.user.id);
+            let synced = 0, failed = 0;
             for (const task of tasks) {
                 try {
                     await DB.cloudAddTask(this.user.id, task);
+                    synced++;
                 } catch (e) {
+                    failed++;
                     console.warn('[Sync] Failed to sync task:', task.id, e.message);
                 }
             }
+            console.log('[Sync] Tasks result:', synced, 'synced,', failed, 'failed');
 
             // Update profile with stats
             const stats = Storage.getStats();

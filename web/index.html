@@ -941,7 +941,7 @@
                         Sign In to Sync
                     </button>
                 </div>
-                <div class="app-version">v1.2.6</div>
+                <div class="app-version">v1.3.0</div>
             </div>
         </div>
 
@@ -1279,15 +1279,19 @@
             <div class="modal-content">
                 <h3>New Group Challenge</h3>
                 <div class="form-group">
-                    <input type="text" id="challenge-title" placeholder="Challenge name" maxlength="50">
+                    <label for="challenge-title">Challenge Name</label>
+                    <input type="text" id="challenge-title" placeholder="e.g. Weekly Sprint" maxlength="50">
                 </div>
                 <div class="form-group">
-                    <input type="number" id="challenge-target" placeholder="Target tasks" value="50" min="5" max="500">
+                    <label for="challenge-target">Target Tasks</label>
+                    <input type="number" id="challenge-target" placeholder="50" value="50" min="5" max="500">
                 </div>
                 <div class="form-group">
-                    <input type="number" id="challenge-bonus" placeholder="Bonus points" value="100" min="10" max="1000">
+                    <label for="challenge-bonus">Bonus Points</label>
+                    <input type="number" id="challenge-bonus" placeholder="100" value="100" min="10" max="1000">
                 </div>
                 <div class="form-group">
+                    <label for="challenge-duration">Duration</label>
                     <select id="challenge-duration">
                         <option value="7">1 week</option>
                         <option value="14">2 weeks</option>

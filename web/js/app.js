@@ -62,6 +62,11 @@ const App = {
         const isOAuthCallback = window.location.hash && window.location.hash.includes('access_token');
         const isRecovery = window.location.hash && window.location.hash.includes('type=recovery');
 
+        // Show screen immediately so nav bar appears without waiting for network
+        if (this.isOnboardingComplete() && !isOAuthCallback && !isRecovery) {
+            this.showScreen('home');
+        }
+
         // Initialize Supabase and check auth
         try {
             const user = await Supabase.init();
@@ -93,14 +98,9 @@ const App = {
             } else {
                 this.showScreen('welcome');
             }
-        } else {
-            // Check for pending action after OAuth callback
-            if (isOAuthCallback && this.isLoggedIn) {
-                const hadPendingAction = await this.checkPendingAction();
-                if (!hadPendingAction) {
-                    this.showScreen('home');
-                }
-            } else {
+        } else if (isOAuthCallback && this.isLoggedIn) {
+            const hadPendingAction = await this.checkPendingAction();
+            if (!hadPendingAction) {
                 this.showScreen('home');
             }
         }
@@ -2497,7 +2497,24 @@ const App = {
 
         const { data: groups, error } = await DB.getMyGroups(this.user.id);
 
-        if (error || !groups || groups.length === 0) {
+        if (error) {
+            console.error('Error loading groups:', error.message);
+            // Retry once after a short delay
+            await new Promise(r => setTimeout(r, 1000));
+            const retry = await DB.getMyGroups(this.user.id);
+            if (!retry.error && retry.data && retry.data.length > 0) {
+                return this.renderGroups();
+            }
+            container.classList.add('hidden');
+            noGroups.classList.remove('hidden');
+            noGroups.innerHTML = `
+                <p>Failed to load groups</p>
+                <p class="groups-hint">Pull down to refresh or try signing out and back in.</p>
+            `;
+            return;
+        }
+
+        if (!groups || groups.length === 0) {
             container.classList.add('hidden');
             noGroups.classList.remove('hidden');
             noGroups.innerHTML = `

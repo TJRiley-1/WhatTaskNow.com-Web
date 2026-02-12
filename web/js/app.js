@@ -345,10 +345,12 @@ const App = {
             // Skip this task and show the next card
             const task = this.acceptedTask;
             if (task && !task.isFallback) {
-                Storage.updateTask(task.id, {
+                const skipUpdates = {
                     timesShown: (task.timesShown || 0) + 1,
                     timesSkipped: (task.timesSkipped || 0) + 1
-                });
+                };
+                Storage.updateTask(task.id, skipUpdates);
+                this.syncToCloud('update', task, skipUpdates);
             }
             this.acceptedTask = null;
             this.currentCardIndex++;
@@ -578,7 +580,7 @@ const App = {
         inputs.forEach(input => {
             const name = input.value.trim();
             if (name) {
-                Storage.addTask({
+                const savedMultiTask = Storage.addTask({
                     name: name,
                     desc: '',
                     type: this.multiAddTask.type,
@@ -586,6 +588,7 @@ const App = {
                     social: this.multiAddTask.social,
                     energy: this.multiAddTask.energy
                 });
+                this.syncToCloud('add', savedMultiTask);
                 savedCount++;
             }
         });
@@ -795,7 +798,7 @@ const App = {
     saveImportTask() {
         if (!this.currentImportTask) return;
 
-        Storage.addTask({
+        const savedImportTask = Storage.addTask({
             name: this.currentImportTask.name,
             desc: '',
             type: this.importTaskSettings.type,
@@ -803,6 +806,7 @@ const App = {
             social: this.importTaskSettings.social,
             energy: this.importTaskSettings.energy
         });
+        this.syncToCloud('add', savedImportTask);
 
         Storage.removePendingImport(this.currentImportTask.id);
         this.currentImportTask = null;
@@ -878,6 +882,7 @@ const App = {
                 this.editingTask.desc = document.getElementById('edit-task-desc').value.trim();
                 this.editingTask.dueDate = document.getElementById('edit-task-due-date').value || null;
                 Storage.updateTask(this.editingTask.id, this.editingTask);
+                this.syncToCloud('update', this.editingTask, this.editingTask);
                 this._notificationCache = null;
                 this.showScreen('manage');
             }
@@ -886,7 +891,9 @@ const App = {
         // Delete task
         document.getElementById('btn-delete-task').addEventListener('click', () => {
             if (confirm('Delete this task?')) {
-                Storage.deleteTask(this.editingTask.id);
+                const deletedId = this.editingTask.id;
+                Storage.deleteTask(deletedId);
+                this.syncToCloud('delete', deletedId);
                 this._notificationCache = null;
                 this.showScreen('manage');
             }
@@ -1102,6 +1109,7 @@ const App = {
 
         this._notificationCache = null; // Invalidate badge cache
         const savedTask = Storage.addTask(this.newTask);
+        this.syncToCloud('add', savedTask);
 
         // Save as template if checked
         if (saveAsTemplate) {
@@ -1218,6 +1226,7 @@ const App = {
                     e.stopPropagation();
                     if (confirm('Are you sure you want to delete this task?')) {
                         Storage.deleteTask(deleteBtn.dataset.id);
+                        this.syncToCloud('delete', deleteBtn.dataset.id);
                         this._notificationCache = null;
                         this.renderTaskList();
                     }
@@ -1412,18 +1421,20 @@ const App = {
                 // Accepted
                 this.acceptedTask = task;
                 if (!task.isFallback) {
-                    Storage.updateTask(task.id, {
-                        timesShown: (task.timesShown || 0) + 1
-                    });
+                    const acceptUpdates = { timesShown: (task.timesShown || 0) + 1 };
+                    Storage.updateTask(task.id, acceptUpdates);
+                    this.syncToCloud('update', task, acceptUpdates);
                 }
                 this.showAcceptedTask();
             } else {
                 // Skipped
                 if (!task.isFallback) {
-                    Storage.updateTask(task.id, {
+                    const swipeSkipUpdates = {
                         timesShown: (task.timesShown || 0) + 1,
                         timesSkipped: (task.timesSkipped || 0) + 1
-                    });
+                    };
+                    Storage.updateTask(task.id, swipeSkipUpdates);
+                    this.syncToCloud('update', task, swipeSkipUpdates);
                 }
                 Storage.incrementSkipped();
                 this.currentCardIndex++;
@@ -1548,9 +1559,11 @@ const App = {
                     dueDate: Storage.getNextDueDate(this.acceptedTask)
                 };
                 Storage.updateTask(this.acceptedTask.id, updates);
+                this.syncToCloud('update', this.acceptedTask, updates);
             } else if (this.acceptedTask.dueDate) {
                 // Non-recurring tasks with a due date: remove from task list
                 Storage.deleteTask(this.acceptedTask.id);
+                this.syncToCloud('delete', this.acceptedTask.id);
             } else {
                 // Non-recurring tasks without a due date: keep in list (reusable)
                 const updates = {
@@ -1558,6 +1571,7 @@ const App = {
                     pointsEarned: (this.acceptedTask.pointsEarned || 0) + points
                 };
                 Storage.updateTask(this.acceptedTask.id, updates);
+                this.syncToCloud('update', this.acceptedTask, updates);
             }
         }
 
@@ -1582,6 +1596,22 @@ const App = {
 
         // Log to completed history
         Storage.addCompletedTask(this.acceptedTask, points, minutesSpent);
+
+        // Sync completed task and profile stats to cloud
+        if (this.isLoggedIn && this.user) {
+            (async () => {
+                try {
+                    await DB.logCompleted(this.user.id, this.acceptedTask.name, this.acceptedTask.type, points, minutesSpent);
+                    const stats = Storage.getStats();
+                    await DB.updateProfile(this.user.id, {
+                        total_points: stats.totalPoints,
+                        total_tasks_completed: stats.completed,
+                        total_time_spent: stats.totalTimeSpent,
+                        current_rank: Storage.getRank(stats.totalPoints).name
+                    });
+                } catch (e) { console.error('[Sync] complete', e); }
+            })();
+        }
 
         // Show celebration
         this._completing = false;
@@ -2382,6 +2412,18 @@ const App = {
             console.error('Error saving profile:', e);
             alert('Failed to save profile: ' + e.message);
         }
+    },
+
+    // Sync a single mutation to cloud (fire-and-forget)
+    syncToCloud(action, task, updates) {
+        if (!this.isLoggedIn || !this.user) return;
+        (async () => {
+            try {
+                if (action === 'add') await DB.cloudAddTask(this.user.id, task);
+                else if (action === 'update') await DB.cloudUpdateTask(this.user.id, task.id, updates);
+                else if (action === 'delete') await DB.cloudDeleteTask(this.user.id, task);
+            } catch (e) { console.error('[Sync]', action, e); }
+        })();
     },
 
     // Auto-sync local data to cloud (called after login, no alerts)
@@ -3261,6 +3303,7 @@ const App = {
                     e.stopPropagation();
                     if (confirm('Are you sure you want to delete this task?')) {
                         Storage.deleteTask(deleteBtn.dataset.id);
+                        this.syncToCloud('delete', deleteBtn.dataset.id);
                         this._notificationCache = null;
                         this.renderCalendar();
                     }

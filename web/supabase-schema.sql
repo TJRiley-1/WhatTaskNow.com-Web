@@ -36,7 +36,8 @@ create table public.tasks (
   times_completed integer default 0,
   points_earned integer default 0,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
-  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  constraint tasks_user_local_unique unique (user_id, local_id)
 );
 
 -- Completed tasks history

@@ -489,6 +489,56 @@ const DB = {
         }
     },
 
+    // Add single task to cloud
+    async cloudAddTask(userId, task) {
+        const query = new SupabaseQuery(Supabase, 'tasks');
+        const { error } = await query.upsert({
+            user_id: userId,
+            local_id: task.id,
+            name: task.name,
+            description: task.desc || null,
+            type: task.type,
+            time: task.time,
+            social: task.social,
+            energy: task.energy,
+            due_date: task.dueDate || null,
+            recurring: task.recurring || 'none',
+            times_shown: task.timesShown || 0,
+            times_skipped: task.timesSkipped || 0,
+            times_completed: task.timesCompleted || 0,
+            points_earned: task.pointsEarned || 0
+        });
+        if (error) throw error;
+    },
+
+    // Update single task in cloud
+    async cloudUpdateTask(userId, localId, updates) {
+        const cloudUpdates = { updated_at: new Date().toISOString() };
+        if ('name' in updates) cloudUpdates.name = updates.name;
+        if ('desc' in updates) cloudUpdates.description = updates.desc || null;
+        if ('type' in updates) cloudUpdates.type = updates.type;
+        if ('time' in updates) cloudUpdates.time = updates.time;
+        if ('social' in updates) cloudUpdates.social = updates.social;
+        if ('energy' in updates) cloudUpdates.energy = updates.energy;
+        if ('dueDate' in updates) cloudUpdates.due_date = updates.dueDate || null;
+        if ('recurring' in updates) cloudUpdates.recurring = updates.recurring || 'none';
+        if ('timesShown' in updates) cloudUpdates.times_shown = updates.timesShown;
+        if ('timesSkipped' in updates) cloudUpdates.times_skipped = updates.timesSkipped;
+        if ('timesCompleted' in updates) cloudUpdates.times_completed = updates.timesCompleted;
+        if ('pointsEarned' in updates) cloudUpdates.points_earned = updates.pointsEarned;
+
+        const query = new SupabaseQuery(Supabase, 'tasks');
+        const { error } = await query.eq('user_id', userId).eq('local_id', localId).update(cloudUpdates);
+        if (error) throw error;
+    },
+
+    // Delete single task from cloud
+    async cloudDeleteTask(userId, localId) {
+        const query = new SupabaseQuery(Supabase, 'tasks');
+        const { error } = await query.eq('user_id', userId).eq('local_id', localId).delete();
+        if (error) throw error;
+    },
+
     // Get tasks from cloud
     async getTasks(userId) {
         const query = new SupabaseQuery(Supabase, 'tasks');
@@ -586,6 +636,9 @@ const DB = {
         }, { returning: false });
 
         if (joinError) {
+            if (joinError.message && (joinError.message.includes('duplicate') || joinError.message.includes('unique') || joinError.message.includes('already exists'))) {
+                return { data: null, error: new Error('You are already a member of this group') };
+            }
             return { data: null, error: joinError };
         }
         return { data: groups[0], error: null };

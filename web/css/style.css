@@ -676,23 +676,32 @@ body {
 .modal-content input,
 .modal-content select {
     width: 100%;
-    background: var(--bg-card);
+    background-color: var(--bg-card);
     border: 2px solid var(--border);
     border-radius: var(--radius-sm);
     padding: 14px;
     color: var(--text);
     font-size: 1rem;
     margin-bottom: 20px;
+    box-sizing: border-box;
     -webkit-appearance: none;
+    -moz-appearance: none;
     appearance: none;
+    color-scheme: dark;
 }
 
 .modal-content select {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23888' d='M1.4 0L6 4.6 10.6 0 12 1.4l-6 6-6-6z'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 14px center;
+    background-color: var(--bg-card);
     padding-right: 40px;
     cursor: pointer;
+}
+
+.modal-content select option {
+    background-color: var(--bg-card);
+    color: var(--text);
 }
 
 .modal-content input:focus,

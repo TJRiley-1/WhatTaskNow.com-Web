@@ -22,7 +22,10 @@ const Supabase = {
             if (storedSession) {
                 try {
                     this.session = JSON.parse(storedSession);
-                    await this.refreshSession();
+                    // Only refresh if token is expired; otherwise reuse it
+                    if (this.isTokenExpired()) {
+                        await this.refreshSession();
+                    }
                 } catch (e) {
                     this.clearSession();
                 }
@@ -32,6 +35,13 @@ const Supabase = {
         // Ensure we have user data if we have a session
         if (this.session && !this.user) {
             await this.getUser();
+            // Fall back to cached user if network failed
+            if (!this.user) {
+                const cachedUser = localStorage.getItem('supabase_user');
+                if (cachedUser) {
+                    try { this.user = JSON.parse(cachedUser); } catch (e) {}
+                }
+            }
         }
 
         return this.user;
@@ -204,7 +214,12 @@ const Supabase = {
             }
             return this.user;
         } catch (e) {
-            this.clearSession();
+            // Only clear session on auth rejection, not on network errors
+            if (e.message && (e.message.includes('Invalid') || e.message.includes('expired') || e.message.includes('revoked'))) {
+                this.clearSession();
+            } else {
+                console.warn('Session refresh failed (network?), keeping session:', e.message);
+            }
             return null;
         }
     },
@@ -276,12 +291,18 @@ const Supabase = {
         if (!this.user) {
             await this.getUser();
         }
+
+        // Persist user data for offline access
+        if (this.user) {
+            localStorage.setItem('supabase_user', JSON.stringify(this.user));
+        }
     },
 
     clearSession() {
         this.session = null;
         this.user = null;
         localStorage.removeItem('supabase_session');
+        localStorage.removeItem('supabase_user');
     },
 
     // Database: Query helper

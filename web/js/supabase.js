@@ -572,6 +572,13 @@ const DB = {
             return { data: null, error: new Error('Invalid invite code') };
         }
 
+        // Check if user is already a member
+        const checkQuery = new SupabaseQuery(Supabase, 'group_members');
+        const { data: existing } = await checkQuery.eq('group_id', groups[0].id).eq('user_id', userId).execute();
+        if (existing && existing.length > 0) {
+            return { data: null, error: new Error('You are already a member of this group') };
+        }
+
         const memberQuery = new SupabaseQuery(Supabase, 'group_members');
         const { error: joinError } = await memberQuery.insert({
             group_id: groups[0].id,

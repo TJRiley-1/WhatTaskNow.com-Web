@@ -1149,7 +1149,7 @@ const App = {
         const levelMap = { low: 1, medium: 2, high: 3 };
 
         if (filterTime) {
-            tasks = tasks.filter(t => t.time <= parseInt(filterTime));
+            tasks = tasks.filter(t => t.time === parseInt(filterTime));
         }
         if (filterEnergy) {
             tasks = tasks.filter(t => levelMap[t.energy] <= levelMap[filterEnergy]);
@@ -1209,19 +1209,18 @@ const App = {
                     const task = Storage.getTasks().find(t => t.id === startBtn.dataset.id);
                     if (task) {
                         this.acceptedTask = task;
-                        document.getElementById('accepted-task-name').textContent = task.name;
-                        document.getElementById('accepted-task-type').textContent = task.type;
-                        document.getElementById('accepted-task-time').textContent = task.time + ' min';
-                        this.showScreen('accepted');
+                        this.showAcceptedTask();
                     }
                     return;
                 }
                 const deleteBtn = e.target.closest('.task-item-delete');
                 if (deleteBtn) {
                     e.stopPropagation();
-                    Storage.deleteTask(deleteBtn.dataset.id);
-                    this._notificationCache = null;
-                    this.renderTaskList();
+                    if (confirm('Are you sure you want to delete this task?')) {
+                        Storage.deleteTask(deleteBtn.dataset.id);
+                        this._notificationCache = null;
+                        this.renderTaskList();
+                    }
                     return;
                 }
                 const taskItem = e.target.closest('.task-item');
@@ -1558,14 +1557,19 @@ const App = {
         Storage.incrementCompleted();
         Storage.addPoints(points, this.acceptedTask.name);
 
-        // Track time if timer was used
+        // Track time spent
         let minutesSpent = null;
         if (this.timerInterval) {
             if (this.timerSeconds > 0) {
                 minutesSpent = Math.ceil(this.timerSeconds / 60);
-                Storage.addTimeSpent(minutesSpent);
             }
             this.cancelTimer();
+        } else {
+            // Use task's estimated time when timer wasn't used
+            minutesSpent = this.acceptedTask.time;
+        }
+        if (minutesSpent) {
+            Storage.addTimeSpent(minutesSpent);
         }
 
         // Log to completed history
@@ -3106,7 +3110,11 @@ const App = {
             container.addEventListener('click', (e) => {
                 const item = e.target.closest('.notification-item');
                 if (item && item.dataset.taskId) {
-                    this.openEditTask(item.dataset.taskId);
+                    const task = Storage.getTasks().find(t => t.id === item.dataset.taskId);
+                    if (task) {
+                        this.acceptedTask = task;
+                        this.showAcceptedTask();
+                    }
                 }
             });
         }
@@ -3222,15 +3230,38 @@ const App = {
                             <div class="calendar-item-name">${this.escapeHtml(task.name)}</div>
                             <div class="calendar-item-meta">${task.type} · ${task.time} min</div>
                         </div>
+                        <button class="task-start-btn" data-id="${task.id}">Start</button>
+                        <button class="task-item-delete" data-id="${task.id}">×</button>
                     </div>
                 `;
             }).join('');
 
-            // Click to edit
-            upcomingContainer.querySelectorAll('.calendar-item').forEach(item => {
-                item.addEventListener('click', () => {
-                    this.openEditTask(item.dataset.id);
-                });
+            // Event delegation for calendar items
+            upcomingContainer.addEventListener('click', (e) => {
+                const startBtn = e.target.closest('.task-start-btn');
+                if (startBtn) {
+                    e.stopPropagation();
+                    const task = Storage.getTasks().find(t => t.id === startBtn.dataset.id);
+                    if (task) {
+                        this.acceptedTask = task;
+                        this.showAcceptedTask();
+                    }
+                    return;
+                }
+                const deleteBtn = e.target.closest('.task-item-delete');
+                if (deleteBtn) {
+                    e.stopPropagation();
+                    if (confirm('Are you sure you want to delete this task?')) {
+                        Storage.deleteTask(deleteBtn.dataset.id);
+                        this._notificationCache = null;
+                        this.renderCalendar();
+                    }
+                    return;
+                }
+                const calItem = e.target.closest('.calendar-item');
+                if (calItem) {
+                    this.openEditTask(calItem.dataset.id);
+                }
             });
         }
 

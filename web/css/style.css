@@ -1364,6 +1364,14 @@ body {
     gap: 12px;
 }
 
+.app-version {
+    text-align: center;
+    color: var(--text-secondary, #999);
+    font-size: 12px;
+    margin-top: 24px;
+    padding-bottom: 8px;
+}
+
 /* Groups Screen */
 .groups-list {
     display: flex;

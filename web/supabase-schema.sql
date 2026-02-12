@@ -102,9 +102,8 @@ create policy "Users can view profiles" on public.profiles
   for select using (
     (select auth.uid()) = id
     or id in (
-      select gm2.user_id from public.group_members gm1
-      join public.group_members gm2 on gm1.group_id = gm2.group_id
-      where gm1.user_id = (select auth.uid())
+      select gm.user_id from public.group_members gm
+      where gm.group_id in (select public.get_user_group_ids((select auth.uid())))
     )
   );
 
@@ -141,11 +140,17 @@ create policy "Anyone can view groups" on public.groups
 create policy "Authenticated users can create groups" on public.groups
   for insert with check ((select auth.uid()) = created_by);
 
--- Group members: members can see their groups
+-- Helper function to get group IDs for a user (bypasses RLS to avoid infinite recursion)
+create or replace function public.get_user_group_ids(_user_id uuid)
+returns setof uuid as $$
+  select group_id from public.group_members where user_id = _user_id;
+$$ language sql security definer set search_path = '';
+
+-- Group members: members can see their own memberships and memberships in groups they belong to
 create policy "Members can view group membership" on public.group_members
   for select using (
-    (select auth.uid()) = user_id or
-    group_id in (select group_id from public.group_members where user_id = (select auth.uid()))
+    (select auth.uid()) = user_id
+    or group_id in (select public.get_user_group_ids((select auth.uid())))
   );
 
 create policy "Users can join groups" on public.group_members

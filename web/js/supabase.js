@@ -569,14 +569,17 @@ const DB = {
     },
 
     // Log completed task
-    async logCompleted(userId, taskName, taskType, points, timeSpent) {
+    async logCompleted(userId, task, points, timeSpent) {
         const query = new SupabaseQuery(Supabase, 'completed_tasks');
         return query.insert({
             user_id: userId,
-            task_name: taskName,
-            task_type: taskType,
+            task_name: task.name,
+            task_type: task.type,
             points: points,
-            time_spent: timeSpent
+            time_spent: timeSpent,
+            task_time: task.time || null,
+            task_social: task.social || null,
+            task_energy: task.energy || null
         });
     },
 

@@ -1601,7 +1601,7 @@ const App = {
         if (this.isLoggedIn && this.user) {
             (async () => {
                 try {
-                    await DB.logCompleted(this.user.id, this.acceptedTask.name, this.acceptedTask.type, points, minutesSpent);
+                    await DB.logCompleted(this.user.id, this.acceptedTask, points, minutesSpent);
                     const stats = Storage.getStats();
                     await DB.updateProfile(this.user.id, {
                         total_points: stats.totalPoints,
@@ -2462,13 +2462,7 @@ const App = {
             const unsynced = completed.slice(lastSyncedIndex + 1);
 
             for (const task of unsynced) {
-                await DB.logCompleted(
-                    this.user.id,
-                    task.name,
-                    task.type,
-                    task.points,
-                    task.timeSpent
-                );
+                await DB.logCompleted(this.user.id, task, task.points, task.timeSpent);
             }
 
             if (completed.length > 0) {
@@ -2802,13 +2796,18 @@ const App = {
 
         listEl.innerHTML = activities.map(a => {
             const timeAgo = this.formatTimeAgo(a.completed_at);
+            const tags = [];
+            if (a.task_type) tags.push(`<span class="activity-tag">${this.escapeHtml(a.task_type)}</span>`);
+            if (a.task_time) tags.push(`<span class="activity-tag">${a.task_time}min</span>`);
+            if (a.task_social) tags.push(`<span class="activity-tag">Social: ${a.task_social}</span>`);
+            if (a.task_energy) tags.push(`<span class="activity-tag">Energy: ${a.task_energy}</span>`);
             return `
                 <div class="activity-item">
                     <div class="activity-text">
-                        <strong>${this.escapeHtml(a.display_name)}</strong> completed
-                        <em>${this.escapeHtml(a.task_name)}</em>
+                        <strong>${this.escapeHtml(a.display_name)}</strong> completed a task
                         — <span class="activity-points">+${a.points} pts</span>
                     </div>
+                    ${tags.length ? `<div class="activity-tags">${tags.join('')}</div>` : ''}
                     <div class="activity-time">${timeAgo}</div>
                 </div>
             `;

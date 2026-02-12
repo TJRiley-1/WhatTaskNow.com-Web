@@ -48,6 +48,9 @@ create table public.completed_tasks (
   task_type text not null,
   points integer not null,
   time_spent integer, -- minutes, nullable
+  task_time integer, -- estimated minutes
+  task_social text, -- low, medium, high
+  task_energy text, -- low, medium, high
   completed_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
@@ -126,9 +129,15 @@ create policy "Users can update own tasks" on public.tasks
 create policy "Users can delete own tasks" on public.tasks
   for delete using ((select auth.uid()) = user_id);
 
--- Completed tasks: users can only access their own
-create policy "Users can view own completed" on public.completed_tasks
-  for select using ((select auth.uid()) = user_id);
+-- Completed tasks: users can view own or group members' completed tasks
+create policy "Users can view own or group members completed" on public.completed_tasks
+  for select using (
+    (select auth.uid()) = user_id
+    or user_id in (
+      select gm.user_id from public.group_members gm
+      where gm.group_id in (select public.get_user_group_ids((select auth.uid())))
+    )
+  );
 
 create policy "Users can insert own completed" on public.completed_tasks
   for insert with check ((select auth.uid()) = user_id);

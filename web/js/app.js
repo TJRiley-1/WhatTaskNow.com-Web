@@ -1565,13 +1565,9 @@ const App = {
                 Storage.deleteTask(this.acceptedTask.id);
                 this.syncToCloud('delete', this.acceptedTask.id);
             } else {
-                // Non-recurring tasks without a due date: keep in list (reusable)
-                const updates = {
-                    timesCompleted: (this.acceptedTask.timesCompleted || 0) + 1,
-                    pointsEarned: (this.acceptedTask.pointsEarned || 0) + points
-                };
-                Storage.updateTask(this.acceptedTask.id, updates);
-                this.syncToCloud('update', this.acceptedTask, updates);
+                // Non-recurring tasks without a due date: remove from task list
+                Storage.deleteTask(this.acceptedTask.id);
+                this.syncToCloud('delete', this.acceptedTask.id);
             }
         }
 
@@ -1612,6 +1608,9 @@ const App = {
                 } catch (e) { console.error('[Sync] complete', e); }
             })();
         }
+
+        // Clear notification cache so next draw reflects deleted task
+        this._notificationCache = null;
 
         // Show celebration
         this._completing = false;

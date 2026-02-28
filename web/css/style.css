@@ -288,6 +288,9 @@ body {
     cursor: pointer;
     transition: all 0.2s ease;
     text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .option-btn:hover {
@@ -2457,29 +2460,81 @@ body {
     margin-bottom: 0;
 }
 
-/* Task Type Delete Button */
-.type-option-wrapper {
-    position: relative;
-    display: inline-block;
+/* Task Type Management Buttons */
+.type-management-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
 }
 
-.type-delete-btn {
-    position: absolute;
-    top: -6px;
-    right: -6px;
-    width: 20px;
-    height: 20px;
-    background: var(--danger);
-    color: white;
-    border: none;
-    border-radius: 50%;
-    font-size: 12px;
-    line-height: 1;
-    cursor: pointer;
-    display: flex;
+.type-management-row .btn {
+    flex: 1;
+}
+
+/* Task Type Edit Mode */
+.type-edit-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 8px;
     align-items: center;
-    justify-content: center;
-    z-index: 1;
+    padding: 10px 12px;
+    background: var(--bg-card);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 8px;
+}
+
+.type-edit-row:last-child {
+    margin-bottom: 0;
+}
+
+.type-edit-arrows {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.type-edit-arrows button {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0 4px;
+    font-size: 0.875rem;
+    line-height: 1;
+}
+
+.type-edit-arrows button:hover {
+    color: var(--primary);
+}
+
+.type-edit-arrows button:disabled {
+    opacity: 0.25;
+    cursor: default;
+}
+
+.type-edit-name {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.type-edit-delete {
+    background: none;
+    border: none;
+    color: var(--danger);
+    cursor: pointer;
+    font-size: 1.25rem;
+    padding: 0 4px;
+    line-height: 1;
+}
+
+.type-edit-delete:disabled {
+    opacity: 0.25;
+    cursor: default;
 }
 
 /* Task Filters */

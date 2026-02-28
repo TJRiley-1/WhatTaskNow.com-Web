@@ -34,6 +34,9 @@ const App = {
     tutorialStep: 0,
     tutorialReviewMode: false,
 
+    // Type edit mode
+    editTypesMode: false,
+
     // Swipe cleanup function
     swipeCleanup: null,
 
@@ -124,6 +127,11 @@ const App = {
         // Clean up swipe listeners when leaving swipe screen
         if (this.currentScreen === 'swipe' && screenId !== 'swipe') {
             this.cleanupSwipe();
+        }
+
+        // Exit type edit mode when navigating away
+        if (this.editTypesMode && screenId !== 'add-type') {
+            this.editTypesMode = false;
         }
 
         const screens = document.querySelectorAll('.screen');
@@ -221,6 +229,18 @@ const App = {
                 input.value = '';
                 document.getElementById('modal-custom-type').classList.add('hidden');
             }
+        });
+
+        // Edit types toggle
+        document.getElementById('btn-edit-types').addEventListener('click', () => {
+            this.editTypesMode = !this.editTypesMode;
+            this.renderTaskTypes();
+        });
+
+        // Restore defaults
+        document.getElementById('btn-restore-defaults').addEventListener('click', () => {
+            Storage.restoreDefaultTypes();
+            this.renderTaskTypes();
         });
 
         // From template button
@@ -997,30 +1017,79 @@ const App = {
     renderTaskTypes() {
         const container = document.getElementById('task-types');
         const types = Storage.getTaskTypes();
-        const defaults = ['Chores', 'Work', 'Health', 'Admin', 'Errand', 'Self-care', 'Creative', 'Social'];
+        const editBtn = document.getElementById('btn-edit-types');
+        const addBtn = document.getElementById('btn-add-custom-type');
+        const restoreBtn = document.getElementById('btn-restore-defaults');
+        const hiddenDefaults = Storage.getHiddenDefaultTypes();
 
-        container.innerHTML = types.map(type => {
-            const isCustom = !defaults.includes(type);
-            if (isCustom) {
-                return `<div class="type-option-wrapper">
-                    <button class="option-btn type-option" data-value="${this.escapeHtml(type)}">${this.escapeHtml(type)}</button>
-                    <button class="type-delete-btn" data-type="${this.escapeHtml(type)}" title="Delete custom type">×</button>
-                </div>`;
+        if (this.editTypesMode) {
+            // Edit mode
+            editBtn.textContent = 'Done';
+            addBtn.classList.add('hidden');
+            container.classList.remove('option-grid');
+
+            if (hiddenDefaults.length > 0) {
+                restoreBtn.classList.remove('hidden');
+            } else {
+                restoreBtn.classList.add('hidden');
             }
-            return `<button class="option-btn type-option" data-value="${type}">${type}</button>`;
-        }).join('');
 
-        // Bind delete buttons for custom types
-        container.querySelectorAll('.type-delete-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const typeName = btn.dataset.type;
-                if (confirm(`Delete custom type "${typeName}"?`)) {
+            const onlyOne = types.length <= 1;
+            container.innerHTML = types.map((type, i) => `
+                <div class="type-edit-row">
+                    <div class="type-edit-arrows">
+                        <button class="type-move-up" data-index="${i}"${i === 0 ? ' disabled' : ''}>&#9650;</button>
+                        <button class="type-move-down" data-index="${i}"${i === types.length - 1 ? ' disabled' : ''}>&#9660;</button>
+                    </div>
+                    <span class="type-edit-name">${this.escapeHtml(type)}</span>
+                    <button class="type-edit-delete" data-type="${this.escapeHtml(type)}"${onlyOne ? ' disabled' : ''} title="Remove type">&times;</button>
+                </div>
+            `).join('');
+
+            // Bind move buttons
+            container.querySelectorAll('.type-move-up').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const idx = parseInt(btn.dataset.index);
+                    if (idx > 0) {
+                        const t = Storage.getTaskTypes();
+                        [t[idx - 1], t[idx]] = [t[idx], t[idx - 1]];
+                        Storage.saveTaskTypes(t);
+                        this.renderTaskTypes();
+                    }
+                });
+            });
+
+            container.querySelectorAll('.type-move-down').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const idx = parseInt(btn.dataset.index);
+                    const t = Storage.getTaskTypes();
+                    if (idx < t.length - 1) {
+                        [t[idx], t[idx + 1]] = [t[idx + 1], t[idx]];
+                        Storage.saveTaskTypes(t);
+                        this.renderTaskTypes();
+                    }
+                });
+            });
+
+            // Bind delete buttons
+            container.querySelectorAll('.type-edit-delete').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const typeName = btn.dataset.type;
                     Storage.removeTaskType(typeName);
                     this.renderTaskTypes();
-                }
+                });
             });
-        });
+        } else {
+            // Normal mode — plain buttons, no wrappers
+            editBtn.textContent = 'Edit';
+            addBtn.classList.remove('hidden');
+            restoreBtn.classList.add('hidden');
+            container.classList.add('option-grid');
+
+            container.innerHTML = types.map(type =>
+                `<button class="option-btn type-option" data-value="${this.escapeHtml(type)}">${this.escapeHtml(type)}</button>`
+            ).join('');
+        }
     },
 
     // Update template button visibility

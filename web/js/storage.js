@@ -149,6 +149,26 @@ const Storage = {
         return types;
     },
 
+    saveTaskTypes(types) {
+        this._setItem(this.KEYS.TASK_TYPES, JSON.stringify(types));
+    },
+
+    getHiddenDefaultTypes() {
+        const current = this.getTaskTypes();
+        return this.DEFAULT_TYPES.filter(t => !current.includes(t));
+    },
+
+    restoreDefaultTypes() {
+        const types = this.getTaskTypes();
+        const missing = this.DEFAULT_TYPES.filter(t => !types.includes(t));
+        if (missing.length > 0) {
+            const merged = [...types, ...missing];
+            this._setItem(this.KEYS.TASK_TYPES, JSON.stringify(merged));
+            return merged;
+        }
+        return types;
+    },
+
     // Tasks
     getTasks() {
         return this._getItem(this.KEYS.TASKS, []);
